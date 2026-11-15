@@ -1,134 +1,48 @@
+# 2024년 구로구 행정처리 흐름을 기준으로 한 조건부 실험
+model_version: "2.0"
+reference_year: 2024
 units:
   mass: t/year
   cost: KRW/year
   time: hours/household/year
 metadata:
-  source_title: Synthetic demonstration assumptions
-  source_url: ''
-  retrieved_at: '2026-11-15'
-  reference_year: 2024
-  geography: hypothetical community
-  waste_scope: paper plastic metal glass only
-  evidence_grade: D
+  geography: 서울특별시 구로구
+  waste_scope: 보고서의 재활용 수거·선별 행정처리 흐름; 구 전체 발생량 아님
+  evidence_grade: 공식자료(B)·외생가정(D) 혼합
   price_year: 2024
-materials:
-  paper: 4000
-  plastic: 3000
-  metal: 1500
-  glass: 1500
 common:
-  households: 10000
-  time_value: 10000
+  # 혼합 전체 품목의 관측값 없음. 플라스틱 시설 문헌은 참고만 하며 외삽은 D가정
+  processing_yield: 0.85
+  # 2024년 공식 최저임금에 맞춘 시간가치 가정
+  time_value: 9860
   discount_rate: 0.03
   life_years: 15
-  reprocessing_per_t: 90000
-  disposal_per_t: 150000
 scenarios:
-- id: A
-  name: Baseline
-  hours: 26
-  utilities: 2000
-  collection_per_t: 70000
-  sorting_per_t: 60000
-  capital: 0
-  producer_real: 0
-  capacity_t: 12000
-  exploratory: false
-  rates:
-    paper:
-    - 0.85
-    - 0.9
-    - 0.85
-    plastic:
-    - 0.85
-    - 0.9
-    - 0.85
-    metal:
-    - 0.85
-    - 0.9
-    - 0.85
-    glass:
-    - 0.85
-    - 0.9
-    - 0.85
-- id: B
-  name: Commingled recyclables
-  hours: 13
-  utilities: 2000
-  collection_per_t: 70000
-  sorting_per_t: 100000
-  capital: 500000000
-  producer_real: 0
-  capacity_t: 12000
-  exploratory: false
-  rates:
-    paper:
-    - 0.9
-    - 0.88
-    - 0.85
-    plastic:
-    - 0.9
-    - 0.88
-    - 0.85
-    metal:
-    - 0.9
-    - 0.88
-    - 0.85
-    glass:
-    - 0.9
-    - 0.88
-    - 0.85
-- id: C
-  name: Mixed waste exploration
-  hours: 8
-  utilities: 2000
-  collection_per_t: 70000
-  sorting_per_t: 130000
-  capital: 900000000
-  producer_real: 0
-  capacity_t: 12000
-  exploratory: true
-  rates:
-    paper:
-    - 0.95
-    - 0.55
-    - 0.7
-    plastic:
-    - 0.95
-    - 0.55
-    - 0.7
-    metal:
-    - 0.95
-    - 0.55
-    - 0.7
-    glass:
-    - 0.95
-    - 0.55
-    - 0.7
-- id: D
-  name: Commingled + design improvement
-  hours: 13
-  utilities: 2000
-  collection_per_t: 70000
-  sorting_per_t: 100000
-  capital: 500000000
-  producer_real: 100000000
-  capacity_t: 12000
-  exploratory: false
-  rates:
-    paper:
-    - 0.9
-    - 0.93
-    - 0.9
-    plastic:
-    - 0.9
-    - 0.93
-    - 0.9
-    metal:
-    - 0.9
-    - 0.93
-    - 0.9
-    glass:
-    - 0.9
-    - 0.93
-    - 0.9
+  - id: A
+    name: 구로구 2024 관측 기준선
+    sorting_target: baseline
+    collection_budget_multiplier: 1.0
+    sorting_budget_multiplier: 1.0
+    additional_capital: 0
+    capacity_t: null
+  - id: B
+    name: 2023년 수준 선별률 회복 목표
+    sorting_target: previous_year
+    collection_budget_multiplier: 0.95
+    sorting_budget_multiplier: 1.05
+    additional_capital: 0
+    capacity_t: null
+  - id: C
+    name: 비용 절감·선별률 저하 실험
+    sorting_target: 0.55
+    collection_budget_multiplier: 0.9
+    sorting_budget_multiplier: 0.9
+    additional_capital: 0
+    capacity_t: null
+  - id: D
+    name: 설비 보강·선별률 65% 목표
+    sorting_target: 0.65
+    collection_budget_multiplier: 1.0
+    sorting_budget_multiplier: 1.1
+    additional_capital: 500000000
+    capacity_t: null

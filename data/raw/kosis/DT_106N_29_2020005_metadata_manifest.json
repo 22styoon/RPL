@@ -1,0 +1,11 @@
+{
+  "endpoint": "https://kosis.kr/openapi/statisticsData.do",
+  "parameters": {
+    "method": "getMeta",
+    "type": "ITM",
+    "orgId": "106",
+    "tblId": "DT_106N_29_2020005"
+  },
+  "sha256": "c1aaa88681f6affc16e7a4b9e40dea02f26744dce48a09c608552b512091c68c",
+  "rows": 946
+}

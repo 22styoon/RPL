@@ -1,9 +1,64 @@
 # 데이터 사전
 
-`data/processed/korea_waste_trend.csv`: value는 원표의 생활계폐기물 발생량(t/일) 전사값입니다. annual_t_estimate는 value × days_in_year로 계산한 근사 t/년이며 반올림된 일평균으로부터 도출했습니다. 원본 연간 발생량으로 취급하지 않습니다.
+## 국가통계포털 주자료
 
-출처 공통 필드: source_url, source_title, retrieved_at(열람일), reference_year(대상연도), geography, waste_scope, unit, evidence_grade. A는 공식 관측, D는 합성 가정입니다. 미확인 수치는 이 표에 입력하지 않습니다.
+- data/raw/kosis/public_waste_summary.json: KOSIS 공개 차트의 실제 응답.
+- data/raw/kosis/public_waste_summary_manifest.json: 조회조건·수집경로·SHA-256.
+- data/processed/kosis_public_waste.csv: 2020~2024 전국 생활폐기물 발생량, 톤/년. 일평균에서 환산한 수치가 아님.
+- data/raw/kosis/*_metadata.json: 인증 API로 받은 분류·항목 설명(키 설정 후).
+- data/processed/kosis/통계표_연도.csv: 상세 통계. 통계부호·분류 코드·단위·최종수정일 보존.
 
-물질수지: generated → collected → sorted → recycled. uncollected, sorting_loss, processing_loss의 합이 disposal입니다. final_rate = recycled / generated. 최종 재생원료 전환율이며 공식 재활용 처리 비율과 다릅니다.
+KOSIS 공개 지표의 전국 코드와 OpenAPI의 자료 항목 코드는 별개입니다. 구분 계층의 지역·품목·총계·소계를 단순 합산하지 않습니다.
 
-원자료 페이지 URL은 sources.csv에 보존했습니다. 현재 추세는 수동 전사로, 원본 보고서 파일 자동수집·해시 보존 파이프라인은 아직 없습니다.
+## 원자료와 변환
+
+- `data/raw/guro_table_5_6.csv`: 구로구의회 보고서 표5·6 수동 전사. 수량 t/년, 예산 천원/년.
+- `data/processed/guro_recycling.csv`: 예산을 ×1,000하여 원/년으로 변환. 물질수지·예산 합계 검증 후 생성.
+- `data/raw/minimum_wage.csv`: 공식 2024 최저임금 원/시간.
+- `data/raw/transcription_manifest.csv`: 전사 CSV 자체의 SHA-256. 원문 파일의 해시와 다름.
+- `data/sources.csv`: 출처·범위·연도·단위·증거등급.
+- `data/input_evidence.csv`: 입력별 근거 등록부. 화면·분석 실행 시 현재 설정값을 다시 적용.
+- `outputs/tables/input_evidence.csv`: 해당 CLI 실행에 사용한 실제 값·근거.
+- `data/processed/korea_waste_trend.csv`: 전국 생활계폐기물 별도 참고 추세. 구로 사례의 보정 계수가 아님.
+
+기본 추적 필드는 source_url, source_title, retrieved_at, reference_year, geography, waste_scope, unit, evidence_grade입니다. 입력 근거의 자료명은 source_url에 대응하는 sources.csv에서 확인할 수 있습니다.
+
+공식 최저임금 자체는 A등급이며, 이를 가계의 시간가치로 쓰는 적용 가정은 D등급입니다. 구로구청 자료를 재수록한 의회 연구보고서 값은 B등급으로 구분했습니다.
+
+## 모형과 결과
+
+| 내부 항목 | 의미 |
+|---|---|
+| handled_t | 보고서의 수거·선별 행정처리 대상량. 구 전체 발생량 아님 |
+| sorted_t | 선별 적격 회수량 |
+| sorting_rate | sorted_t / handled_t |
+| processing_yield | 선별 후 최종 재처리 수율 가정 |
+| recycled_t | sorted_t × processing_yield |
+| final_rate | recycled_t / handled_t. 가정 적용 전환비율 |
+| comparison_cost | 공공예산 대리값 + 추가 신규 투자 연간화 |
+| recycling_ok | A와 사용자의 목표 중 더 높은 전환비율 충족 여부 |
+| capacity_status | 연간 처리용량 미확인·충족·초과 |
+| feasible | 재생원료 조건을 충족하고 확인된 용량 초과가 없는 조건부 비교 대상 |
+| fully_verified | 모든 제약 검증 여부. 현재는 법규·용량 등 미검증으로 아니오 |
+| savings_vs_a | A의 포함비용 − 해당 대안 포함비용 |
+
+화면과 CSV는 한글 열 이름을 사용하며 비율은 %입니다. 내부 Python 값은 0~1 비율입니다. 미공표 비용은 None/빈 칸을 유지하므로 0원으로 읽으면 안 됩니다.
+
+전국 추세 value는 t/일 전사값입니다. annual_t_estimate는 반올림된 일평균 ×해당연도 일수의 근사치이며 원자료 연간량이 아닙니다. 2020·2024년은 366일을 사용합니다.
+
+## 인증 상세 자료의 계층과 4품목 파생그룹
+
+지역·배출방식·품목은 class_1 부모 코드로 복원합니다. geography는 최상위 지역, emission_route는 배출방식, class_1_path는 전체 경로입니다. class_2_path와 processing_method는 발생·처리방법 계층을 복원하며 '재활용 소계(물질+에너지)'를 별도 표시합니다.
+
+data/processed/kosis_material_routes_2024.csv는 18지역 ×2배출방식 ×4품목의 144행, kosis_materials_2024.csv는 배출방식 합산 후 72행입니다. 전국과 17개 시도는 함께 합산하지 않습니다.
+
+- 폐지류: 혼합배출 폐지류 + 분리배출 종이팩·기타.
+- 폐합성수지류: 혼합배출 폐합성수지류 + 분리배출 비닐류·발포수지류·PET병·기타.
+- 폐금속류: 혼합배출 폐금속류 + 분리배출 고철류·금속캔.
+- 폐유리류: 혼합배출 폐유리류 + 분리배출 폐유리병류.
+
+영농폐비닐은 별도 영농폐기물 가지에 있어 이 그룹에서 제외합니다. 전자제품·가구 등 복합제품의 재질도 분해하지 않습니다. 따라서 전국 모든 재질 총량을 뜻하지 않습니다.
+
+합산한 원표 코드를 각 행에 보존합니다. 관측 상위행이 있는 경우 그 하위행을 다시 합산하지 않습니다. 필요한 관측이 결측이면 합산값도 결측을 유지합니다. 물질재활용 처리비율은 해당 처리량/발생량이며 최종 재생원료 수율이 아닙니다.
+
+원표 소수 첫째 자리의 반올림 때문에 개별 처리 합계에 최대 0.4톤/년 잔차가 있습니다. 2024년 전국 상세 발생량은 17,045,141.1톤/년이고 공개 지표는 정수로 표시합니다.

@@ -1,0 +1,19 @@
+{
+  "source": "KOSIS OpenAPI",
+  "endpoint": "https://kosis.kr/openapi/Param/statisticsParameterData.do",
+  "parameters": {
+    "method": "getList",
+    "orgId": "106",
+    "tblId": "DT_106N_29_2020005",
+    "prdSe": "Y",
+    "startPrdDe": "2024",
+    "endPrdDe": "2024",
+    "itmId": "13103134417I119",
+    "objL1": "ALL",
+    "objL2": "ALL"
+  },
+  "retrieved_at": "2026-11-15T23:49:25+09:00",
+  "rows": 5292,
+  "sha256": "15cfcb17bed854cacfe29699161931f397b9b0a8fc13722c90cfcd1266e1d927",
+  "evidence_grade": "A"
+}
