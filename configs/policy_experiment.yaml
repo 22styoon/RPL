@@ -1,0 +1,72 @@
+model_version: "3.0"
+reference_year: 2024
+region: 전국
+baseline_yields:
+  폐지류: 0.85
+  폐합성수지류: 0.85
+  폐금속류: 0.85
+  폐유리류: 0.85
+# KOSIS에 없는 지역·품목별 비용은 0으로 대체하지 않습니다.
+costs:
+  collection_per_t: null
+  material_processing_per_t: null
+  other_treatment_per_t: null
+  processing_residue_per_t: null
+economics:
+  include_household: false
+  households: null
+  baseline_minutes_per_week: null
+  time_value: 9860
+  discount_rate: 0.03
+  life_years: 15
+constraints:
+  minimum_final_rate: 0.0
+  annual_public_budget: null
+  material_capacity_t: null
+  require_known_capacity: false
+scan_adoption: false
+scenarios:
+  - id: A
+    name: KOSIS 처리실적 기준선·최종수율 가정
+    treatment_change_pp: 0.0
+    yield_change_pp: 0.0
+    collection_factor: 1.0
+    processing_factor: 1.0
+    other_factor: 1.0
+    capital: 0
+    additional_capacity_t: 0
+    producer_real_per_t: 0
+    household_time_factor: 1.0
+  - id: B
+    name: 추가 회수·품질 저하 가능성 실험
+    treatment_change_pp: 0.03
+    yield_change_pp: -0.02
+    collection_factor: 0.95
+    processing_factor: 1.1
+    other_factor: 1.0
+    capital: 0
+    additional_capacity_t: 0
+    producer_real_per_t: 0
+    household_time_factor: 0.8
+  - id: C
+    name: 비용 절감·회수 저하 실험
+    treatment_change_pp: -0.03
+    yield_change_pp: 0.0
+    collection_factor: 0.9
+    processing_factor: 0.95
+    other_factor: 1.0
+    capital: 0
+    additional_capacity_t: 0
+    producer_real_per_t: 0
+    household_time_factor: 0.8
+  - id: D
+    name: 회수·재생공정 개선 목표 실험
+    treatment_change_pp: 0.06
+    yield_change_pp: 0.02
+    collection_factor: 1.0
+    processing_factor: 1.1
+    other_factor: 1.0
+    capital: 0
+    additional_capacity_t: 0
+    producer_real_per_t: 0
+    household_time_factor: 0.9
