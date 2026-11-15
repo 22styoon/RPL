@@ -1,0 +1,15 @@
+{
+  "source_url": "https://kosis.kr/visual/nsportalStats/detailContents.do?listId=C&statJipyoId=3664&vStatJipyoId=5061",
+  "endpoint": "https://kosis.kr/visual/nsportalStats/selectDetailJipyoInfo.do",
+  "parameters": {
+    "listId": "C",
+    "vStatJipyoId": "5061",
+    "statJipyoId": "3664",
+    "relation": ""
+  },
+  "unit": "톤/년(출처 화면에서 확인)",
+  "method": "공개 차트 POST; 인증키 미사용",
+  "retrieved_at": "2026-11-15T23:41:10+09:00",
+  "rows": 5,
+  "sha256": "aaecbfa44703b84ab08f2d9ee58830e8710886209208c6d304a92950a445648c"
+}
