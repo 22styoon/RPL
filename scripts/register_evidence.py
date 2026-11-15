@@ -11,6 +11,7 @@ def write_csv(path, rows):
         w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
 sources=[]
 for id,title,url,year,scope,unit,grade,status,notes in [
+    ("KOSIS_API","KOSIS 폐기물 발생량 및 처리현황_생활폐기물","https://kosis.kr/statHtml/statHtml.do?orgId=106&tblId=DT_106N_29_2020005","2024","전국 및 17시도 생활폐기물; 지역·배출방식·품목 계층 유지","톤/년","A","인증 OpenAPI 실제 조회·원응답 보존","5,292행과 메타데이터 946개 수집. 4품목은 대응 분류의 파생그룹; 영농·복합제품 재질 제외."),
     ("KOSIS_PUBLIC","KOSIS 100대지표 생활폐기물 발생량","https://kosis.kr/visual/nsportalStats/detailContents.do?listId=C&statJipyoId=3664&vStatJipyoId=5061","2020~2024","전국 생활폐기물; 생활계 전체와 다름","톤/년","A","KOSIS 공개 지표 응답 직접 수집","원통계표 DT_106N_29_2020005. 인증 OpenAPI 상세 조회와 구분."),
     ("GURO","구로구 생활폐기물 재활용 활성화 정책 연구",report,"2022~2024","구로구 수거·선별 행정처리 흐름","t/년·원/년","B","공식 원표 전사·단위 변환","표5·6(인쇄57~58쪽), 구청 자료 재수록. 예산은 실물비용/집행액이 아님."),
     ("GURO_SYSTEM","구로구 재활용품 선별시설 안내","https://www.guro.go.kr/www/contents.do?key=2672","현재 시설 설명","구로구 재활용품 선별시설","제도 설명","A","공식 안내 확인","재활용품 혼합 배출을 선별하는 시설. 일일 명목용량을 연간 처리용량으로 환산하지 않음."),

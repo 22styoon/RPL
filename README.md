@@ -40,7 +40,13 @@ KOSIS 공개 지표에서 직접 수집한 2020~2024 전국 생활폐기물 발�
 .\.venv\Scripts\python collect_kosis.py --public-summary
 ```
 
-실제 인증 성공과 상세 응답 검증은 키 설정 후 가능합니다. [설정 및 출처](docs/kosis_setup.md)를 참고하세요.
+현재 프로젝트는 인증 조회에 성공해 2024년 상세 통계 5,292행을 저장했습니다. 지역·배출방식·처리방법 필터와 중복 없는 4품목 집계를 제공합니다. 새 환경의 갱신 작업에는 본인의 로컬 키가 필요합니다. [설정 및 출처](docs/kosis_setup.md)를 참고하세요.
+
+한글 품목 결과는 outputs/tables/kosis_materials_2024.csv에 저장됩니다. 저장된 상세 자료와 메타데이터로 집계를 재현하려면 실행합니다.
+
+```powershell
+.\.venv\Scripts\python scripts/prepare_kosis.py
+```
 
 ## 무엇이 실제 자료인가
 

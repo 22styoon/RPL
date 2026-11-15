@@ -6,6 +6,7 @@ from src.model import ROOT, load_config, load_observations, baseline, compare, b
 from src.presentation import korean_table, PARAMETERS
 from src.provenance import inputs_table
 from src.kosis import KosisError, collect_all, display_table
+from src.kosis_analysis import display_materials
 
 st.set_page_config(page_title="분리배출 정책 실험실", layout="wide")
 st.title("분리배출 정책 실험실")
@@ -37,7 +38,7 @@ with kosis_tab:
     st.caption("KOSIS 공개 지표의 원수치입니다. API 인증을 거친 상세 통계표 자료와 수집 경로를 구분해 기록했습니다. 생활폐기물과 사업장비배출 포함 생활계 전체는 범위가 다릅니다.")
     st.markdown("[KOSIS 공식 지표](https://kosis.kr/visual/nsportalStats/detailContents.do?listId=C&statJipyoId=3664&vStatJipyoId=5061) · [상세 원표](https://kosis.kr/statHtml/statHtml.do?orgId=106&tblId=DT_106N_29_2020005&conn_path=I2)")
     st.subheader("지역·품목·처리방법별 상세 자료")
-    st.caption("상세 OpenAPI에는 발급된 KOSIS_API_KEY가 필요합니다. 프로젝트 .env에 설정한 뒤 아래 버튼을 누르세요. 키를 화면에 입력하거나 표시하지 않습니다.")
+    st.caption("인증 OpenAPI로 수집한 상세 통계를 표시합니다. 새로 불러오면 로컬 설정의 인증키를 사용해 원표와 품목 집계를 함께 갱신합니다.")
     if st.button("KOSIS 공식 상세 자료 불러오기"):
         try:
             with st.spinner("KOSIS 상세 통계 수집 중"):
@@ -49,7 +50,31 @@ with kosis_tab:
     if files:
         for file in files:
             frame = pd.read_csv(file, keep_default_na=False, dtype={"class_1_id":str,"class_2_id":str,"item_id":str})
-            st.dataframe(display_table(frame), hide_index=True)
+            st.caption(f"수집된 상세 관측 셀: {len(frame):,}개 · 단위: 톤/년")
+            if "processing_method" in frame:
+                regions = ["전국"] + sorted(set(frame.geography) - {"전국"})
+                region = st.selectbox("상세 통계 지역", regions, key="region_"+file.stem)
+                subset = frame.loc[frame.geography == region]
+                route = st.selectbox("상세 통계 배출방식", ["전체"]+sorted(subset.emission_route.unique().tolist()), key="route_"+file.stem)
+                if route != "전체":
+                    subset = subset.loc[subset.emission_route == route]
+                methods = st.multiselect("상세 통계 처리방법", sorted(subset.processing_method.unique().tolist()), default=["발생량","물질재활용"], key="methods_"+file.stem)
+                subset = subset.loc[subset.processing_method.isin(methods)]
+                st.dataframe(display_table(subset[["geography","emission_route","class_1_path","processing_method","value","unit","reference_year"]]), hide_index=True)
+                material_path = ROOT / f"data/processed/kosis_materials_{int(frame.reference_year.iloc[0])}.csv"
+                if material_path.exists():
+                    materials = pd.read_csv(material_path)
+                    materials = materials.loc[materials.geography == region]
+                    st.subheader(f"{region} 대응 4품목 발생·처리 현황")
+                    columns = ["material","generated_t","material_recycling_t","energy_recovery_t","material_treatment_rate_pct"]
+                    shown_materials = display_materials(materials[columns])
+                    st.dataframe(shown_materials, hide_index=True)
+                    melted = shown_materials.melt(id_vars="품목 그룹", value_vars=["발생량(톤/년)","물질재활용 처리량(톤/년)","에너지회수(톤/년)"], var_name="통계 구분", value_name="물량(톤/년)")
+                    st.plotly_chart(px.bar(melted, x="품목 그룹", y="물량(톤/년)", color="통계 구분", barmode="group"), width="stretch")
+                    st.download_button("지역별 4품목 한글 CSV", display_materials(materials).to_csv(index=False).encode("utf-8-sig"), f"kosis_materials_{region}.csv", "text/csv", key="materials_"+file.stem)
+                    st.caption("두 배출방식의 대응 품목을 묶은 파생그룹입니다. 영농폐비닐과 복합제품 재질은 제외합니다. 물질재활용 처리량은 최종 재생원료 생산량이 아닙니다. 공개 지표의 정수 표시와 상세 원표의 소수점 표기는 정밀도가 다릅니다.")
+            else:
+                st.dataframe(display_table(frame), hide_index=True)
             st.download_button("상세 원표 CSV 내려받기", display_table(frame).to_csv(index=False).encode("utf-8-sig"), file.name, "text/csv", key=file.stem)
         st.caption("지역·품목의 상하위 계층에 총계·소계가 함께 있습니다. 행을 단순 합산하면 중복됩니다. 최종 재생원료 수율은 이 통계로 자동 추정하지 않습니다.")
     else:

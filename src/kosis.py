@@ -119,15 +119,22 @@ def fetch_metadata(table, api_key, root=ROOT):
     path = Path(root) / "data/raw/kosis"
     path.mkdir(parents=True, exist_ok=True)
     (path / f"{table['table_id']}_metadata.json").write_bytes(raw)
+    manifest = dict(endpoint=BASE+"statisticsData.do", parameters=dict(method="getMeta", type="ITM", orgId=table["org_id"], tblId=table["table_id"]),
+                    sha256=hashlib.sha256(raw).hexdigest(), rows=len(records))
+    (path / f"{table['table_id']}_metadata_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     return records
 
 def collect_table(table, api_key, root=ROOT):
     validate_table(table)
+    metadata = fetch_metadata(table, api_key, root) if table["table_id"] == "DT_106N_29_2020005" else None
     parameters = dict(method="getList", orgId=table["org_id"], tblId=table["table_id"],
                       prdSe="Y", startPrdDe=str(table["year"]), endPrdDe=str(table["year"]), **table["selection"])
     records, raw = request_api("Param/statisticsParameterData.do", parameters, api_key)
     stamp = datetime.now(ZoneInfo("Asia/Seoul")).isoformat(timespec="seconds")
     frame = normalize_records(records, table, stamp)
+    if metadata is not None:
+        from src.kosis_analysis import annotate_classifications
+        frame = annotate_classifications(frame, metadata)
     raw_dir, processed_dir = Path(root)/"data/raw/kosis", Path(root)/"data/processed/kosis"
     raw_dir.mkdir(parents=True, exist_ok=True); processed_dir.mkdir(parents=True, exist_ok=True)
     name = f"{table['table_id']}_{table['year']}"
@@ -137,6 +144,9 @@ def collect_table(table, api_key, root=ROOT):
                     parameters=parameters, retrieved_at=stamp, rows=len(frame),
                     sha256=hashlib.sha256(raw).hexdigest(), evidence_grade="A")
     (raw_dir / f"{name}_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    if metadata is not None:
+        from src.kosis_analysis import process_saved_table
+        frame, _ = process_saved_table(table["table_id"], str(table["year"]), root)
     return frame
 
 def collect_all():
@@ -150,4 +160,6 @@ def display_table(frame):
              "evidence_grade":"근거등급", "table_id":"통계표 식별자", "last_changed":"최종 수정일", "collection_method":"수집 경로"}
     for i in range(1,9):
         names.update({f"class_{i}_id":f"분류{i} 코드", f"class_{i}_name":f"분류{i} 값", f"class_{i}_type":f"분류{i} 종류"})
+    names.update({"class_1_path":"지역·품목 계층 경로", "class_2_path":"처리방법 계층 경로",
+                  "emission_route":"배출방식", "processing_method":"처리방법"})
     return frame.rename(columns=names)
