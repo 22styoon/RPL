@@ -155,6 +155,22 @@ def render_regional_indicator():
                 st.download_button(name+" CSV",csv_path.read_bytes(),csv_path.name,"text/csv",key="regional_download_"+name)
         st.warning("R은 재질 구성과 재질별 처리비율의 산술 결합입니다. 회귀 p값은 지표 타당성이나 정책효과를 증명하지 않습니다.")
     st.info(f'시군구는 이름·2024년 말 코드가 연결된 {summary["sigungu_verified_rows"]}행입니다. 연중 행정경계 검증과 실제 정책 자료가 없어 정책 결합은 {summary["verified_join_rows"]}행입니다.')
+    sigungu_report=OUTPUT/"reports/regional_indicator_sigungu"
+    sigungu_manifest=sigungu_report/"manifest.json"
+    if sigungu_manifest.exists():
+        county=json.loads(sigungu_manifest.read_text(encoding="utf-8"));county_summary=county["summary"]
+        st.divider();st.subheader("시군구 보조 기술 비교")
+        st.caption("2024년 공식 원표 지역명 기준 229개 지역의 R/S 분포입니다. 2024년 말 코드의 연중 경계 검증 전이므로 지도·정책 결합·회귀를 제공하지 않습니다.")
+        st.metric("시군구 관측",f'{county_summary["sigungu_count"]}개 · {county_summary["material_rows"]} 재질행')
+        for key,title,table_name in (("county_scatter","시군구 R과 S","scores"),("county_distribution","분포 비교","scores"),("county_extremes","표준화 상·하위","scores")):
+            figure=artifact_path(f"figures/regional_indicator_sigungu/{key}.json")
+            st.plotly_chart(pio.read_json(figure),width="stretch",key="regional_sigungu_"+key)
+        county_scores=artifact_path("tables/regional_indicator_sigungu/scores.csv")
+        with st.expander("시군구 전체 지표 CSV"):
+            st.dataframe(pd.read_csv(county_scores),hide_index=True)
+            st.download_button("시군구 지표 CSV",county_scores.read_bytes(),county_scores.name,"text/csv",key="regional_sigungu_scores")
+        county_html=sigungu_report/"index.html"
+        if county_html.exists():st.download_button("시군구 오프라인 보고서 HTML",county_html.read_bytes(),county_html.name,"text/html",key="regional_sigungu_html")
     for name in ("index.html","report.md"):
         file=directory/name
         if file.exists():st.download_button("지역 분석 보고서 "+name,file.read_bytes(),name,"text/html" if name.endswith("html") else "text/markdown",key="regional_report_"+name)

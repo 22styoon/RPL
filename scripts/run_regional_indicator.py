@@ -10,13 +10,19 @@ def main(argv=None):
         if hasattr(stream,"reconfigure"):stream.reconfigure(encoding="utf-8")
     parser=argparse.ArgumentParser(description="R/S 표준화 지표·기여도·가중치 민감도·회귀진단 생성")
     parser.add_argument("--year",type=int,default=2024)
-    parser.add_argument("--level",choices=("sido",),default="sido")
+    parser.add_argument("--level",choices=("sido","sigungu"),default="sido")
     parser.add_argument("--output-root",type=Path,default=ROOT/"outputs")
     args=parser.parse_args(argv)
     if args.year!=2024:parser.error("현재 검증된 원자료는 2024년입니다.")
-    result=run(output_root=args.output_root)
+    if args.level=="sido":
+        result=run(output_root=args.output_root)
+        report="reports/regional_indicator"
+    else:
+        from src.analysis.sigungu_indicator_report import run as run_sigungu
+        result=run_sigungu(output_root=args.output_root)
+        report="reports/regional_indicator_sigungu"
     print(json.dumps({"status":result["status"],"summary":result["summary"],
-        "html":str(args.output_root/"reports/regional_indicator/index.html"),
-        "markdown":str(args.output_root/"reports/regional_indicator/report.md")},ensure_ascii=False,indent=2))
+        "html":str(args.output_root/report/"index.html"),
+        "markdown":str(args.output_root/report/"report.md")},ensure_ascii=False,indent=2))
     return 0
 if __name__=="__main__":raise SystemExit(main())

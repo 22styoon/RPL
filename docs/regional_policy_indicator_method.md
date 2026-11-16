@@ -48,3 +48,11 @@
 ## 생성물
 
 `outputs/reports/regional_indicator/index.html`과 `report.md`, `outputs/tables/regional_indicator/`의 지표·기여도·가중치·추론 표, `outputs/figures/regional_indicator/`의 Plotly JSON/HTML 및 PNG/SVG를 생성합니다. 기본 통계 화면에는 **시도 표준화 분석** 메뉴가 추가됩니다.
+
+## 시군구 보조 기술 비교
+
+동일한 전국 재질 가중치 `w_m`를 시군구 229곳 모두에 적용해 `R_r`와 `S_r`를 비교합니다. 입력은 2024년 공식 원표에서 읽은 4개 재질별 발생량 `G_rm` 및 물질재활용 처리량 `M_rm` 916행입니다. 시군구별 `R_r=100Σ(G_rm/Σ_m G_rm)(M_rm/G_rm)`, `S_r=100Σw_m(M_rm/G_rm)`, 차이는 `R_r-S_r`(%p)로 계산합니다.
+
+현재 로컬 자료의 `R` 범위는 0–100%, 중앙값 39.234%이며, `S` 범위는 0–100%, 중앙값 38.449%입니다. `R-S` 중앙값은 +0.147%p입니다. 가장 큰 양의 차이는 전북 김제시(+24.678%p; R 64.021%, S 39.343%), 가장 큰 음의 차이는 경남 밀양시(-15.369%p; R 70.099%, S 85.468%)입니다. 전국 발생량 가중치와 비교할 때 시군구별 재질 비중 평균 가중치는 최대 2.774%p 점수 변화, 4재질 균등 가중치는 최대 33.523%p 변화를 만들었습니다. 이는 가중치 선택에 대한 민감도 결과이며 정책 효과를 뜻하지 않습니다.
+
+행정코드 연결은 2024년 12월 스냅샷이고 연중 경계 변경 감사가 끝나지 않았습니다. 지역명은 공식 원표 이름을 따릅니다. 시군구 정책 검증 결합은 0행이며, 이는 정책 시행이 없었다는 뜻이 아니라 확인 가능한 정책 자료가 아직 결합되지 않았다는 뜻입니다. 이 분석에서는 시군구 지도, 회귀, 인과 해석을 하지 않습니다. 생성물은 `outputs/reports/regional_indicator_sigungu/index.html`, `report.md`, `outputs/tables/regional_indicator_sigungu/`, `outputs/figures/regional_indicator_sigungu/`에 저장됩니다. 실행 명령은 `scripts/run_regional_indicator.py --year 2024 --level sigungu`입니다.

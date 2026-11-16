@@ -22,13 +22,19 @@ def main(argv=None):
     from src.analysis.pipeline import run
     manifest=run(output_root=args.output_root)
     regional=None
+    regional_sigungu=None
     if not args.skip_regional_indicator:
         from src.analysis.regional_indicator_report import run as run_regional
         regional=run_regional(output_root=args.output_root)
+        sigungu_input=ROOT/"data/processed/regional_2024/sigungu_2024_materials_verified.csv"
+        if sigungu_input.exists():
+            from src.analysis.sigungu_indicator_report import run as run_sigungu
+            regional_sigungu=run_sigungu(output_root=args.output_root)
     print(json.dumps({"status":manifest["status"],"analysis_count":manifest["analysis_count"],
         "report":str(args.output_root/"reports/statistical_analysis/index.html"),
         "markdown":str(args.output_root/"reports/statistical_analysis/report.md"),
-        "regional_indicator":str(args.output_root/"reports/regional_indicator/index.html") if regional else None},ensure_ascii=False,indent=2))
+        "regional_indicator":str(args.output_root/"reports/regional_indicator/index.html") if regional else None,
+        "regional_sigungu_indicator":str(args.output_root/"reports/regional_indicator_sigungu/index.html") if regional_sigungu else None},ensure_ascii=False,indent=2))
     return 0
 
 if __name__=="__main__":

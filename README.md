@@ -99,6 +99,16 @@ JODAL=...
 
 [비용 근거의 경계](docs/cost_boundary.md) · [비용 현황 기록](docs/current_social_cost_status_2026-11-16.md) · [보조 민감도 사용법](docs/policy_experiment_guide.md)
 
+## 2024 지역 표준화 분석
+
+전국 기준의 시도 보고서는 `outputs/reports/regional_indicator/index.html`에 생성됩니다. 시군구 기술 비교는 아래 명령으로 만들며, HTML 보고서와 CSV·그래프를 `outputs/reports/regional_indicator_sigungu/`, `outputs/tables/regional_indicator_sigungu/`, `outputs/figures/regional_indicator_sigungu/`에 저장합니다.
+
+```powershell
+.\.venv\Scripts\python scripts/run_regional_indicator.py --year 2024 --level sigungu
+```
+
+현재 로컬의 공식 원표 처리 결과는 시군구 229곳, 4개 재질 916행입니다. `R`은 해당 지역의 실제 재질 구성으로 집계한 처리비율이고 `S`는 모든 지역에 KOSIS 전국 재질 발생 비중을 적용한 비교값입니다. 시군구 결과는 기술 비교이며, 2024년 연중 행정경계 감사와 정책 자료 결합이 끝날 때까지 지도·정책 순위·시군구 회귀로 해석하지 않습니다. 원자료와 처리 데이터는 배포 권한을 확인하기 전 저장소에 포함하지 않으므로, 새 환경에서는 지역 자료 수집 및 전처리가 먼저 필요합니다.
+
 ## 검증
 
 ```powershell

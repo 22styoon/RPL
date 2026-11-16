@@ -5,6 +5,7 @@ import pytest
 from src.analysis.standardization import MATERIALS, REGIONS, compute_standardization
 from src.analysis.regional_inference import run_composition_diagnostics
 from src.analysis.regional_indicator_report import run as run_regional_report
+from src.analysis.sigungu_indicator_report import run as run_sigungu_report
 from src.regional_data.geocodes import normalize_mois
 
 
@@ -90,3 +91,24 @@ def test_offline_regional_report_has_hashed_tables_and_figures(tmp_path):
     assert (tmp_path/"reports/regional_indicator/report.md").exists()
     assert "tables/regional_indicator/scores.csv" in manifest["artifacts"]
     assert "figures/regional_indicator/regional_scores.png" in manifest["artifacts"]
+
+
+def test_standardization_supports_many_named_areas_without_inference():
+    frame=synthetic_frame()
+    regions=frame.loc[frame.geography!="전국","geography"].drop_duplicates().tolist()
+    frame["geography"]=frame.geography.where(frame.geography=="전국",frame.geography+"시")
+    expected=[name+"시" for name in regions]
+    scores,contributions,sensitivity,_,_=compute_standardization(frame,expected_regions=expected,region_label="시군구")
+    assert len(scores)==17 and set(scores["시군구"])==set(expected)
+    assert len(contributions)==68 and len(sensitivity)==68
+
+
+def test_offline_sigungu_report_uses_229_real_regions(tmp_path):
+    from src.model import ROOT
+    manifest=run_sigungu_report(root=ROOT,output_root=tmp_path)
+    assert manifest["status"]=="complete"
+    assert manifest["summary"]["sigungu_count"]==229
+    assert manifest["summary"]["material_rows"]==916
+    assert manifest["summary"]["verified_join_rows"]==0
+    assert (tmp_path/"reports/regional_indicator_sigungu/index.html").exists()
+    assert "tables/regional_indicator_sigungu/scores.csv" in manifest["artifacts"]
