@@ -8,7 +8,7 @@ import yaml
 from src.model import ROOT
 from src.analysis.pipeline import TITLE
 
-MENU=["국내 통계 현황","지역·재질별 비교","시도 표준화 분석","해외 통계 비교","시설 및 비용 분석","가구 시간 분석","선행연구","자료 출처·품질","가정 기반 민감도 분석"]
+MENU=["국내 통계 현황","재활용 지표 연구","지역·재질별 비교","시도 표준화 분석","해외 통계 비교","시설 및 비용 분석","가구 시간 분석","선행연구","자료 출처·품질","가정 기반 민감도 분석"]
 REPORT=ROOT/"outputs/reports/statistical_analysis"
 OUTPUT=ROOT/"outputs"
 
@@ -175,12 +175,62 @@ def render_regional_indicator():
         file=directory/name
         if file.exists():st.download_button("지역 분석 보고서 "+name,file.read_bytes(),name,"text/html" if name.endswith("html") else "text/markdown",key="regional_report_"+name)
 
+def render_recycling_indicator():
+    st.subheader("재활용률의 국제 비교: 지표 설계와 근거")
+    directory=OUTPUT/"reports/recycling_indicator"
+    manifest_path=directory/"manifest.json"
+    if not manifest_path.exists():
+        st.info("선행연구·실측 통계·설명 사례로 지표 연구 보고서를 생성합니다.")
+        st.code(r".\.venv\Scripts\python scripts/run_recycling_indicator.py",language="powershell")
+        if st.button("보유 자료로 지표 연구 보고서 생성",key="build_recycling_indicator"):
+            from src.analysis.recycling_indicator_report import run
+            run();st.rerun()
+        return
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    summary=manifest["summary"]
+    columns=st.columns(3)
+    columns[0].metric("학술·공식·방법 근거",f'{summary["source_items"]}항목')
+    columns[1].metric("에너지회수 포함/제외 차이",f'{summary["kosis_energy_gap_pp"]:.2f}%p')
+    columns[2].metric("시도 구성 표준화 차이 최대",f'{summary["maximum_composition_gap_pp"]:.2f}%p')
+    st.caption("수치 카드: KOSIS 2024 대응 4재질 처리량 기준. 최종 재생원료 산출률·정책효과와 구분합니다.")
+    st.markdown("**H**는 같은 범위·원산지·발생연도의 폐기물에서 얻은 최종 재생물질의 비율입니다. **S**는 재질 구성을 공통 가중치로 고정한 비교값입니다.")
+    st.latex(r"H=100\frac{\sum_m F_m}{\sum_m G_m},\qquad S=100\sum_m w_m^*\frac{F_m}{G_m}")
+    st.info("현재 국내 자료는 처리량입니다. 새 최종 H/S 국가값과 특정 정책의 인과효과는 아직 식별되지 않았습니다. 아래 실측 그림과 가상 설명을 구분해 확인하세요.")
+    st.caption("0.2·0.3·0.5는 한국 EPR 의무율 산정용 과거 실적 가중치입니다. 통상 의무율 산정연도 t에서 t−4·t−3·t−2에 적용하며 국가 연간 실적률의 보편 산식과 다릅니다.")
+    from src.analysis.recycling_indicator_report import CHARTS
+    actual,examples=st.tabs(["실제 통계·문헌 사례","지표 작동 설명·인과 경로"])
+    for container,names in [(actual,["swiss_stages","nea_scope","kosis_energy","regional_scores"]),
+                            (examples,["composition_example","time_methods","partial_bounds","mass_flow"])]:
+        with container:
+            for name in names:
+                _,title,label,note,_=CHARTS[name]
+                st.markdown("**"+title+"**");st.caption(label)
+                st.plotly_chart(pio.read_json(artifact_path(f"figures/recycling_indicator/{name}.json")),width="stretch",key="indicator_"+name)
+                st.write(note)
+                with st.expander("수치 CSV·발표용 PNG/SVG"):
+                    for extension,folder,mime in [("csv","tables","text/csv"),("png","figures","image/png"),("svg","figures","image/svg+xml")]:
+                        path=artifact_path(f"{folder}/recycling_indicator/{name}.{extension}")
+                        st.download_button(extension.upper(),path.read_bytes(),path.name,mime,key="indicator_"+name+extension)
+        if container is examples:
+            with container:
+                st.image(str(artifact_path("figures/recycling_indicator/causal_dag.png")),caption="인과 가설. 지역·시장 여건의 교란은 구성 표준화만으로 제거되지 않습니다.")
+    with st.expander("전체 연구·근거·독립 검증 계획"):
+        st.markdown("측정 경계 감사 → 독립 최종 산출과의 일치 → 국가·가중치 민감도 → 정책 패널 인과분석 → 환경·비용 검증 순서로 진행합니다. 산식의 단조성·구성 불변성은 프로그램으로 검증하며 정책 인과효과는 추가 식별이 필요합니다.")
+        sources=pd.read_csv(artifact_path("tables/recycling_indicator/sources.csv"))
+        st.dataframe(sources[["source_id","title","year","verified","contribution","limitation"]],hide_index=True)
+    for filename,label,mime in [("index.html","대화형 연구 보고서 HTML","text/html"),("study.md","전체 연구 논증 Markdown","text/markdown"),("sources.json","출처·확인 범위 JSON","application/json")]:
+        path=directory/filename
+        st.download_button(label,path.read_bytes(),filename,mime,key="indicator_report_"+filename)
+
+
 def main():
     st.set_page_config(page_title=TITLE,layout="wide")
     st.title(TITLE)
     st.caption("국내외 실제 통계 · 독립 연구 질문 · 출처와 정의 확인 · Python으로 재현")
     page=st.sidebar.radio("분석 영역",MENU,key="analysis_page")
     manifest=load_manifest()
+    if page=="재활용 지표 연구":
+        render_recycling_indicator();return
     if page=="시도 표준화 분석":
         render_regional_indicator();return
     if page=="가정 기반 민감도 분석":

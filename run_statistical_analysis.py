@@ -21,6 +21,8 @@ def main(argv=None):
             return 2
     from src.analysis.pipeline import run
     manifest=run(output_root=args.output_root)
+    from src.analysis.recycling_indicator_report import run as run_recycling_indicator
+    run_recycling_indicator(output_root=args.output_root)
     regional=None
     regional_sigungu=None
     if not args.skip_regional_indicator:
@@ -33,6 +35,7 @@ def main(argv=None):
     print(json.dumps({"status":manifest["status"],"analysis_count":manifest["analysis_count"],
         "report":str(args.output_root/"reports/statistical_analysis/index.html"),
         "markdown":str(args.output_root/"reports/statistical_analysis/report.md"),
+        "recycling_indicator":str(args.output_root/"reports/recycling_indicator/index.html"),
         "regional_indicator":str(args.output_root/"reports/regional_indicator/index.html") if regional else None,
         "regional_sigungu_indicator":str(args.output_root/"reports/regional_indicator_sigungu/index.html") if regional_sigungu else None},ensure_ascii=False,indent=2))
     return 0
