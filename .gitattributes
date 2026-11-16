@@ -1,0 +1,4 @@
+# 원자료·정규화 통계의 SHA-256을 OS의 줄바꿈 변환으로 변경하지 않음
+data/raw/international/** -text
+data/processed/international/** -text
+data/raw/public_data/** -text

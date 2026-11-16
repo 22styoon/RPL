@@ -1,87 +1,91 @@
-# 분리배출 정책 실험실
+# RPL | 분리배출 정책 통계분석 및 시각화
 
-KOSIS 국가통계포털의 실제 전국 생활폐기물 추세를 기본 현황 자료로 사용합니다. 구로구 처리실적·예산은 별도의 시설 사례 실험에 사용합니다. 화면, 그래프, 다운로드 CSV는 한글입니다.
+국내외 폐기물 실데이터를 Python으로 수집·정제·분석하고, 질문별 표·그래프·출처·한계를 재현하는 연구 프로젝트입니다. 현재 **독립 분석 9개**를 제공합니다. 기존 정책 계산은 별도의 **가정 기반 민감도 분석**입니다.
+
+[대화형 통계 보고서](outputs/reports/statistical_analysis/index.html) · [개편 결과·검증](docs/statistical_refactor_report_2026-11-16.md) · [분석 사용법](docs/statistical_analysis_guide.md) · [선행연구](docs/literature_review.md)
 
 ## 실행
 
-기존 가상환경이 있으면 프로젝트 폴더에서 실행합니다.
+기존 가상환경에서는 한 명령으로 저장한 실데이터의 표·PNG/SVG·대화형 그래프·보고서를 다시 만듭니다. 기본 재생성은 네트워크나 API 키를 사용하지 않습니다.
 
 ```powershell
+.\.venv\Scripts\python run_statistical_analysis.py
 .\.venv\Scripts\python -m streamlit run app.py
 ```
 
-브라우저에서 http://localhost:8501 에 접속합니다. 터미널에서 Ctrl+C로 종료합니다.
+웹 화면은 http://localhost:8501 에서 열립니다. 보고서는 outputs/reports/statistical_analysis/index.html을 브라우저에서 직접 열어도 됩니다. 외부 CDN 없이 대화형 그래프를 사용할 수 있습니다.
 
-새 환경 설치 및 재현:
+새 환경:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
-.\.venv\Scripts\python scripts/prepare_data.py
-.\.venv\Scripts\python scripts/register_evidence.py
-.\.venv\Scripts\python run_analysis.py
-.\.venv\Scripts\python -m pytest -q
+.\.venv\Scripts\python run_statistical_analysis.py
 ```
 
-## 국가통계포털 API 연결
+## 현재 분석
 
-KOSIS 공개 지표에서 직접 수집한 2020~2024 전국 생활폐기물 발생량을 바로 확인할 수 있습니다. 지역·품목·처리방법별 상세 OpenAPI에는 사용자 인증키가 필요합니다.
+| 질문 | 데이터 | 결과 |
+|---|---|---|
+| 국내 발생량은 어떻게 변했는가 | KOSIS 동일 정의 2020~2024 | 추세·증감률·지수·기간 연평균 증감률 |
+| 재질별 처리경로는 어떻게 다른가 | KOSIS 2024 대응 4품목 | 물질재활용·에너지회수·소각·매립·기타 구성 |
+| 지역 간 처리 구성 차이는 어느 정도인가 | 전국 행과 분리한 17개 시도 | 발생량을 분모로 한 처리비율. 인구보정 지표는 미산출 |
+| 선별 회수량과 잔재는 어떻게 변했는가 | 구로구 2022~2024 행정실적 | 관측 처리 흐름·선별 회수율 |
+| 공개 예산과 처리대상량은 어떻게 변했는가 | 구로구 같은 연도 예산 | 명목 예산 구성·처리대상량당 예산 참고비율 |
+| 시설 명부가 실제로 제공하는 정보는 무엇인가 | 처리시설 API 786행 | 용량·기준연도·지역명 등의 결측률 |
+| 해외 국가의 발생량 분포는 어떠한가 | Eurostat 2024 municipal waste | 38개 국가 코드 중 33개 값·5개 결측을 구분한 kg/인·년 |
+| 같은 나라의 재질별 보고 재활용 비율은 어떠한가 | 싱가포르 NEA 2024 | 재질 14개의 국내·비국내 부문 합계 |
+| 영국 보고시설 반입량 분포는 어떠한가 | England WDI 2024 Version 2 | 원표 352,275행 → 공개 허가번호 6,452개, 구간·요약통계 |
 
-[KOSIS 활용신청](https://kosis.kr/openapi/serviceUse/serviceUseUnityReg_01Detail.do) 후 프로젝트 .env에 KOSIS_API_KEY를 저장하세요. 빈 형식은 .env.example에 있습니다. 키는 Git 추적에서 제외하며 요청 URL·로그에도 저장하지 않습니다.
+영국 원자료·시설별 행은 출처의 조건부 이용허락에 따라 Git 공개 대상에서 제외합니다. 해당 자료가 없는 환경에서는 이 분석을 자료 미확보로 기록하며, 나머지 분석을 재생성합니다.
+
+## 해외 자료 수집
+
+공식 API·PDF·HTML·ZIP/XLSB에서 실제 검증한 형식만 사용합니다. 원본과 SHA-256, 열람일, 단위·범위·추정 여부를 보존합니다.
+
+```powershell
+.\.venv\Scripts\python scripts/collect_international.py --sources eurostat nea epa
+.\.venv\Scripts\python scripts/collect_international.py --sources uk_waste
+.\.venv\Scripts\python run_statistical_analysis.py
+```
+
+출처 등록은 configs/external_sources.yaml, 원본은 data/raw/international, 정규화 자료는 data/processed/international입니다. OECD 구조화 흐름 통계는 미검증이며, 원문 다운로드 시도도 현재 접근 실패 상태입니다. 확인하지 않은 SDMX 주소나 모형 수치를 만들지 않습니다.
+
+## 국내 API 갱신
+
+.env는 Git에서 제외합니다. KOSIS·공공데이터포털·나라장터의 인증정보는 별개로 관리합니다.
+
+```text
+KOSIS_API_KEY=...
+DATA_GO_KR_SERVICE_KEY=...
+JODAL=...
+```
 
 ```powershell
 .\.venv\Scripts\python collect_kosis.py --metadata
 .\.venv\Scripts\python collect_kosis.py
-```
-
-공개 전국 지표만 갱신할 때는 인증키 없이 다음을 실행합니다.
-
-```powershell
 .\.venv\Scripts\python collect_kosis.py --public-summary
+.\.venv\Scripts\python scripts/collect_public_data.py --dataset facilities --limit-pages 10
+.\.venv\Scripts\python scripts/collect_public_data.py --dataset contracts --begin 2024-01-01 --end 2024-01-07 --limit-pages 1
 ```
 
-현재 프로젝트는 인증 조회에 성공해 2024년 상세 통계 5,292행을 저장했습니다. 지역·배출방식·처리방법 필터와 중복 없는 4품목 집계를 제공합니다. 새 환경의 갱신 작업에는 본인의 로컬 키가 필요합니다. [설정 및 출처](docs/kosis_setup.md)를 참고하세요.
+계약은 JODAL 키를 우선 사용하고 미설정이면 공통 키를 사용합니다. 조회일은 등록·변경·삭제 사건일이며 서비스 연도와 다릅니다. 기본 페이지 예산은 전체 요청을 통틀어 1페이지입니다. [API 수집 범위](docs/public_data_api_inventory.md)와 [KOSIS 설정](docs/kosis_setup.md)을 확인하세요.
 
-한글 품목 결과는 outputs/tables/kosis_materials_2024.csv에 저장됩니다. 저장된 상세 자료와 메타데이터로 집계를 재현하려면 실행합니다.
+## 해석 원칙
+
+- 관측 통계, 공개 예산 대리값, 공식 추정치, 문헌 모형, 외생 가정을 구분합니다.
+- KOSIS 물질재활용 처리량은 최종 재생원료 생산량이 아닙니다.
+- 구로구 2024 수거·선별 예산 115.29억원은 관측 총사회적 비용이 아닙니다.
+- 한국·해외의 연도·폐기물 범위·분자·분모·처리단계가 다르면 통합 비교를 차단합니다.
+- 비용 단가 4개·실제 가구 시간·최종 수율·용량은 아직 추가 근거가 필요합니다. 결측은 0으로 채우지 않습니다.
+- 문헌 평균으로 개인별 표본을 생성하지 않습니다. 짧은 연도 자료에서 정책 인과효과나 회귀 결과를 꾸미지 않습니다.
+
+[비용 근거의 경계](docs/cost_boundary.md) · [비용 현황 기록](docs/current_social_cost_status_2026-11-16.md) · [보조 민감도 사용법](docs/policy_experiment_guide.md)
+
+## 검증
 
 ```powershell
-.\.venv\Scripts\python scripts/prepare_kosis.py
+.\.venv\Scripts\python -m pytest -q
 ```
 
-## 무엇이 실제 자료인가
-
-구로구의회 2025년 12월 최종보고서 표5·6에 수록된 2024년 처리대상량 13,195t, 선별량 7,733t, 잔재량 5,462t 및 수거운반·선별처리 예산을 사용합니다. 보고서의 원표명은 '재활용 발생량'이나 구 전체 가정 발생량으로 해석하지 않습니다.
-
-구로구는 이미 혼합 배출 재활용품을 선별합니다. 이번 모형은 혼합수거 도입의 효과가 아니라 현행 처리 흐름의 개선 목표를 실험합니다. 품목별 구성 미공표로 4품목을 임의 배분하지 않고 합계 흐름으로 계산합니다. 지역별 4품목은 별도 KOSIS 기준선으로 분석합니다. 구로구 예산을 전국 비용으로 외삽하지 않습니다.
-
-## 사용법
-
-1. **국가통계포털(KOSIS)**: 전국 실제 추세와 API 상세 수집을 확인합니다. **구로구 실제 실적**에서는 구로구 2022~2024 실적·예산과 별도 전국 추세를 확인합니다.
-2. **조건부 정책 실험**: KOSIS 지역별 4품목 또는 구로구 시설·예산을 선택합니다. 지역 실험은 처리비율·수율 효과, 비용 4단가, 가계 범위, 예산·용량, 적용 비중을 편집합니다. 시설 실험은 개별 수율·선별률·예산 배율과 새 대안을 편집합니다. 목표곡선·탈락 이유·민감도와 현재 실행 ZIP을 확인합니다.
-3. **가구당 시간 비용**: 2024 최저임금 9,860원/시간을 기준으로 주당 절약 시간의 연간 가치를 계산합니다.
-4. **입력 근거와 출처**: 관측·외생 가정·미확인과 중간 개발 보고서를 확인합니다. 실제 변경값은 각 실험의 JSON·ZIP에 보존됩니다.
-
-지역별 정책 입력은 `configs/policy_experiment.yaml`, 구로구 기본 입력은 `configs/scenarios.yaml`에서 수정합니다. CSV는 결과이므로 수정해도 모형 입력이 바뀌지 않습니다. 현재 지원하는 사례연도는 2024년입니다.
-
-`python run_analysis.py`는 `outputs/tables/`에 한글 비교표·민감도·입력근거·시나리오별 물질수지를 저장합니다. 비율은 한글 결과 CSV에서 % 단위입니다. 빈 비용은 0이 아니라 미확인입니다.
-
-지역별 실험을 명령행으로 재현할 수 있습니다.
-
-```powershell
-.\.venv\Scripts\python run_policy.py
-.\.venv\Scripts\python run_policy.py --region 서울 --target 0.40 --scan-adoption
-```
-
-결과는 outputs/policy_runs/latest/에 저장합니다. 단가 미입력 시 물량·제약 결과는 계산하지만 비용 순위는 보류합니다.
-
-[정책 실험 사용법](docs/policy_experiment_guide.md) · [중간 개발 보고서](docs/interim_development_report_2026-11-16.md)
-
-## 해석 범위
-
-- 관측 선별률과 가정 재처리 수율을 구분합니다. 최종 재생원료량은 관측값이 아닙니다.
-- 구로구는 공공예산 대리값, 지역 4품목은 입력 단가에 따른 범위 내 비교비용입니다. 관측 총사회적 비용·순후생이 아닙니다.
-- 지역 4품목의 단가 4개는 미입력으로 시작합니다. 가계비를 포함할 때에는 범위가 맞는 가구 수·시간 입력이 필요합니다. 구로구 미확인 비용은 별도 가산하지 않습니다.
-- 연간 시설용량과 법규를 검증하지 않아 결과는 조건부 최소비용안입니다.
-- B의 과거 선별률 재사용, 대안별 예산 배율, 추가 투자비·수명·할인율은 정책효과 관측이 아닌 가정입니다.
-
-세부 내용은 [가정](docs/assumptions.md), [자료 조사](docs/research.md), [데이터 사전](docs/data_dictionary.md)을 확인하세요.
+중복집계·물질수지·연도/단위/정의 불일치·결측 보존·출처 해시·그래프 수치 재현·화면 렌더링을 검증합니다. 기존 내부 정책 인터페이스와 run_analysis.py·run_policy.py는 보조 분석용으로 유지합니다.

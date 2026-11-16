@@ -1,0 +1,15 @@
+{
+  "source_id": "nea",
+  "source_url": "https://www.nea.gov.sg/docs/default-source/default-document-library/waste-and-recycling-statistics-2015-to-2025.pdf",
+  "retrieved_at": "2026-11-16T08:26:48+09:00",
+  "sha256": "a4aaff0ef2da9f907a9863f7df64cdc572bf9cf44667213c63306a7040a136ee",
+  "bytes": 163847,
+  "raw_file": "data/raw/international/nea/a4aaff0ef2da9f90/nea_waste_2015_2025.pdf",
+  "license": "Singapore Open Data Licence; source conditions apply",
+  "redistribution": "attribution_required",
+  "status": "normalized",
+  "reference_date": "2026-11-16",
+  "record_count": 495,
+  "processed_file": "data/processed/international/nea/records.csv",
+  "processed_sha256": "f6dca8b1bfecac5af51240226f6b877df5d594bd533032c2192915d06a01c09a"
+}

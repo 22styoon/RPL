@@ -17,13 +17,16 @@ class DashboardTests(unittest.TestCase):
         app = AppTest.from_file(APP).run(timeout=40)
         self.assertEqual(len(app.exception), 0)
         self.assertEqual(len(app.error), 0)
+        app.sidebar.radio[0].set_value("가정 기반 민감도 분석").run(timeout=40)
         return app
 
     def test_default_keeps_missing_costs_and_offers_report(self):
         app = self.ready()
         self.assertEqual(metric(app, "조건부 최소 비교비용 정책"), "비용 입력 후 순위 산정")
         self.assertEqual(metric(app, "필수 비용 입력완료"), "0 / 4개")
-        self.assertTrue(any("중간 개발 보고서" in item.proto.label for item in app.get("download_button")))
+        app.sidebar.radio[0].set_value("국내 통계 현황").run(timeout=40)
+        self.assertTrue(any("대화형 보고서" in item.proto.label for item in app.get("download_button")))
+        app.sidebar.radio[0].set_value("가정 기반 민감도 분석").run(timeout=40)
         self.assertTrue(any("범위 내 비교비용(원/년)" in frame.value.columns for frame in app.dataframe))
 
     def test_national_cost_inputs_adoption_and_capacity_are_applied(self):
@@ -60,6 +63,7 @@ class DashboardTests(unittest.TestCase):
         config["scenarios"]=list(reversed(config["scenarios"]))
         with patch("src.model.load_config",return_value=config):
             app=AppTest.from_file(APP).run(timeout=40)
+            app.sidebar.radio[0].set_value("가정 기반 민감도 분석").run(timeout=40)
             widget(app.radio,"policy_mode").set_value("구로구 시설·예산").run(timeout=40)
         self.assertEqual(len(app.exception),0)
         self.assertEqual(len(app.error),0)

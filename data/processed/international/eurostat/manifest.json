@@ -1,0 +1,15 @@
+{
+  "source_id": "eurostat",
+  "source_url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/env_wasmun?lang=EN&time=2024&geoLevel=country",
+  "retrieved_at": "2026-11-16T08:26:48+09:00",
+  "sha256": "2b247ff6538e0d7bab31d6de3e95e3060517892df6ac2d5c2fe7c56794e41f66",
+  "bytes": 11123,
+  "raw_file": "data/raw/international/eurostat/2b247ff6538e0d7b/env_wasmun_2024.json",
+  "license": "Eurostat reuse with attribution; dataset notes apply",
+  "redistribution": "attribution_required",
+  "status": "normalized",
+  "reference_date": "2026-11-16",
+  "record_count": 760,
+  "processed_file": "data/processed/international/eurostat/records.csv",
+  "processed_sha256": "871323659fed3827e3bbd7c67f9af37f2a00e6a526e591621936708d25d8ac69"
+}
