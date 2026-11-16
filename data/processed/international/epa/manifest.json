@@ -1,0 +1,15 @@
+{
+  "source_id": "epa",
+  "source_url": "https://www.epa.gov/facts-and-figures-about-materials-waste-and-recycling/national-overview-facts-and-figures-materials",
+  "retrieved_at": "2026-11-16T08:26:48+09:00",
+  "sha256": "db9b48463b79447b0a6849b22bbae9cc478309b50681728845bcb451e3ac249c",
+  "bytes": 121327,
+  "raw_file": "data/raw/international/epa/db9b48463b79447b/epa_2018_overview.html",
+  "license": "US EPA public information; attribution and third-party exclusions",
+  "redistribution": "check_third_party_materials",
+  "status": "normalized",
+  "reference_date": "2026-11-16",
+  "record_count": 3,
+  "processed_file": "data/processed/international/epa/records.csv",
+  "processed_sha256": "65f936e6d36c424f7ab44c76b5c7b4691c09ae3afdb9915f49303ab7d4cafa9c"
+}

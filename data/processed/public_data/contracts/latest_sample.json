@@ -1,0 +1,50 @@
+{
+  "authentication_success": true,
+  "candidate_count": 100,
+  "complete": false,
+  "completed_queries": 0,
+  "data_kind": "live",
+  "dataset": "contracts",
+  "date_filter": "operation_specific_registration_change_deletion",
+  "finished_at": "2026-11-15T22:38:57.317522+00:00",
+  "license": "이용허락범위 제한 없음",
+  "limit_pages": 1,
+  "normalized_path": "C:\\Users\\bourb\\Desktop\\HYU\\1-2\\문기인\\RPL\\data\\processed\\public_data\\contracts\\20261115T223854-3d8afb71",
+  "pages": [
+    {
+      "endpoint": "https://apis.data.go.kr/1230000/ao/CntrctInfoService/getCntrctInfoListServc",
+      "file": "page-00001.redacted.json",
+      "operation": "getCntrctInfoListServc",
+      "original_response_sha256": "8109b717fe6aaa3e57208548e3032f39316a5e2c304b14b389388ea975f33c40",
+      "parameters": {
+        "inqryBgnDt": "202401010000",
+        "inqryDiv": 1,
+        "inqryEndDt": "202401072359",
+        "numOfRows": 100,
+        "pageNo": 1,
+        "type": "json"
+      },
+      "query_period": "2024-01-01/2024-01-07",
+      "retrieved_at": "2026-11-15T22:38:57.282831+00:00",
+      "row_count": 100,
+      "snapshot_sha256": "3bf70fecce6900934ccb1727530dc3f1c96c906fd364830cec97cd4549d705f9",
+      "total_count": 12511
+    }
+  ],
+  "query_count": 3,
+  "raw_directory": "C:\\Users\\bourb\\Desktop\\HYU\\1-2\\문기인\\RPL\\data\\raw\\public_data\\contracts\\20261115T223854-3d8afb71",
+  "record_count": 100,
+  "reference_period": null,
+  "region_filter": null,
+  "region_filter_basis": "title_or_agency_text_only",
+  "requested_period": "2024-01-01/2024-01-07",
+  "response_retention": "public_fields_only_redacted_snapshot_original_bytes_not_saved",
+  "run_id": "20261115T223854-3d8afb71",
+  "schema_status": "live_success_verified",
+  "schema_version": "1.0",
+  "source_id": "DATA_GO_15129427",
+  "source_url": "https://www.data.go.kr/data/15129427/openapi.do",
+  "started_at": "2026-11-15T22:38:54.767332+00:00",
+  "status": "partial",
+  "unfiltered_record_count": 100
+}

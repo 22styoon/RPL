@@ -1,0 +1,36 @@
+schema_version: "1.0"
+datasets:
+  facilities:
+    source_id: DATA_GO_15172490
+    title: 한국환경공단 생활폐기물정보관리시스템 처리시설 정보
+    source_url: https://www.data.go.kr/data/15172490/openapi.do
+    base_url: https://apis.data.go.kr/B552584/rwBzentyInfoService
+    operations:
+      - getList
+    response_format_parameter: returnType
+    success_codes: ["200"]
+    schema_status: live_success_verified
+    live_verified_operations: [getList]
+    live_verified_formats: [json]
+    historical_filter: false
+    date_filter: null
+    license: 이용허락범위 제한 없음
+  contracts:
+    source_id: DATA_GO_15129427
+    title: 조달청 나라장터 계약정보서비스 용역
+    source_url: https://www.data.go.kr/data/15129427/openapi.do
+    base_url: https://apis.data.go.kr/1230000/ao/CntrctInfoService
+    operations:
+      - getCntrctInfoListServc
+      - getCntrctInfoListServcChgHstry
+      - getCntrctInfoListServcDltHstry
+    response_format_parameter: type
+    success_codes: ["00"]
+    no_data_codes: ["03"]
+    schema_status: live_success_verified
+    live_verified_operations: [getCntrctInfoListServc]
+    live_verified_formats: [json]
+    historical_filter: true
+    date_filter: operation_specific_registration_change_deletion
+    max_window_days: 7
+    license: 이용허락범위 제한 없음

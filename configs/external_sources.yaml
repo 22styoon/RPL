@@ -1,0 +1,47 @@
+schema_version: "1.0"
+verified_at: "2026-11-16"
+sources:
+  eurostat:
+    dataset_id: env_wasmun
+    country: multiple_European_countries
+    reference_year: 2024
+    source_url: https://ec.europa.eu/eurostat/databrowser/view/env_wasmun/default/table
+    format: JSON-stat_2
+    license: Eurostat reuse with attribution; country metadata apply
+    verified_interface: statistics_API_1.0
+    collection_status: see_processed_manifest
+  uk_waste:
+    dataset_id: 2024_WDI_received_v2
+    country: England
+    reference_year: 2024
+    source_url: https://www.data.gov.uk/dataset/81f9d676-e77c-4d68-ab0c-b67e0b0b353e/2024-waste-data-interrogator
+    format: ZIP_XLSB
+    license: Environment Agency Conditional Licence; internal/personal research, one-year and redistribution conditions
+    redistribution: restricted_do_not_publish_raw_or_site_rows
+    collection_status: see_processed_manifest
+  nea:
+    dataset_id: waste_statistics_2015_2025
+    country: Singapore
+    reference_year: 2015-2025
+    source_url: https://www.nea.gov.sg/our-services/waste-management/waste-statistics-and-overall-recycling
+    format: linked_official_PDF
+    license: Singapore Open Data Licence; source conditions apply
+    collection_status: see_processed_manifest
+  epa:
+    dataset_id: MSW_2018_national_overview
+    country: United_States
+    reference_year: 2018
+    source_url: https://www.epa.gov/facts-and-figures-about-materials-waste-and-recycling/national-overview-facts-and-figures-materials
+    format: official_HTML_summary
+    license: EPA public information; third-party exclusions
+    measurement_type: official_estimate
+    collection_status: see_processed_manifest
+  oecd:
+    dataset_id: Global_Plastics_Outlook_2022_flows_chapter
+    country: Global
+    reference_year: 2019
+    source_url: https://www.oecd.org/en/publications/2022/02/global-plastics-outlook_a653d1c9/full-report/component-7.html
+    format: official_report_HTML
+    license: OECD publication reuse conditions
+    measurement_type: model_estimate
+    collection_status: download_failed_structured_table_unverified

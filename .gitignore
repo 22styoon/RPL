@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 .env
 outputs/
+# 영국 WDI의 조건부 이용허락: 원자료·시설별 행의 공개 재배포 제외
+data/raw/international/uk_waste/
+data/processed/international/uk_waste/

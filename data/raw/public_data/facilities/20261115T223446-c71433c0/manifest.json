@@ -1,0 +1,159 @@
+{
+  "authentication_success": true,
+  "candidate_count": 0,
+  "complete": true,
+  "completed_queries": 1,
+  "data_kind": "live",
+  "dataset": "facilities",
+  "date_filter": null,
+  "finished_at": "2026-11-15T22:34:48.644174+00:00",
+  "license": "이용허락범위 제한 없음",
+  "limit_pages": 10,
+  "normalized_path": "C:\\Users\\bourb\\Desktop\\HYU\\1-2\\문기인\\RPL\\data\\processed\\public_data\\facilities\\20261115T223446-c71433c0",
+  "pages": [
+    {
+      "endpoint": "https://apis.data.go.kr/B552584/rwBzentyInfoService/getList",
+      "file": "page-00001.redacted.json",
+      "operation": "getList",
+      "original_response_sha256": "0d59bd24c4374d1c26ca38e8248bff25da5723ec7fc451a41814b50a361bd217",
+      "parameters": {
+        "numOfRows": 100,
+        "pageNo": 1,
+        "returnType": "json"
+      },
+      "query_period": null,
+      "retrieved_at": "2026-11-15T22:34:46.191341+00:00",
+      "row_count": 100,
+      "snapshot_sha256": "597c7b28fa71707d36de41e8f90083e7cdf59e693f12940674a1b6c203bbb45f",
+      "total_count": 786
+    },
+    {
+      "endpoint": "https://apis.data.go.kr/B552584/rwBzentyInfoService/getList",
+      "file": "page-00002.redacted.json",
+      "operation": "getList",
+      "original_response_sha256": "7c0c179e7390774862d3bb7f6f50ca454fa8d2b979ee2c495ec4cf9bc8766ff3",
+      "parameters": {
+        "numOfRows": 100,
+        "pageNo": 2,
+        "returnType": "json"
+      },
+      "query_period": null,
+      "retrieved_at": "2026-11-15T22:34:46.595872+00:00",
+      "row_count": 100,
+      "snapshot_sha256": "4b37b9910bd991cab2433425e6084c8118b642b2fa832a3860af132e8c19251f",
+      "total_count": 786
+    },
+    {
+      "endpoint": "https://apis.data.go.kr/B552584/rwBzentyInfoService/getList",
+      "file": "page-00003.redacted.json",
+      "operation": "getList",
+      "original_response_sha256": "834221eed8181aa798ef3575c6434ba2846f0d0c7e8c1573641da3319ee17944",
+      "parameters": {
+        "numOfRows": 100,
+        "pageNo": 3,
+        "returnType": "json"
+      },
+      "query_period": null,
+      "retrieved_at": "2026-11-15T22:34:46.955933+00:00",
+      "row_count": 100,
+      "snapshot_sha256": "a5d8f9d2de515de9956cbdd388e5b14a068a6ed449206d99943ad20a8df6c8f9",
+      "total_count": 786
+    },
+    {
+      "endpoint": "https://apis.data.go.kr/B552584/rwBzentyInfoService/getList",
+      "file": "page-00004.redacted.json",
+      "operation": "getList",
+      "original_response_sha256": "b55c1ad98efd0e99acfafab7a19dc04ea0abf8bb9e4ec374c1631179583154cc",
+      "parameters": {
+        "numOfRows": 100,
+        "pageNo": 4,
+        "returnType": "json"
+      },
+      "query_period": null,
+      "retrieved_at": "2026-11-15T22:34:47.241254+00:00",
+      "row_count": 100,
+      "snapshot_sha256": "93d2cdc1c6c85c6b9933185865a15883f958a8851d1d21fc4241d0bde9cc052a",
+      "total_count": 786
+    },
+    {
+      "endpoint": "https://apis.data.go.kr/B552584/rwBzentyInfoService/getList",
+      "file": "page-00005.redacted.json",
+      "operation": "getList",
+      "original_response_sha256": "670ae13ce0f524aed4594ad65c55615face3522df42d8b429f57ef41c485b715",
+      "parameters": {
+        "numOfRows": 100,
+        "pageNo": 5,
+        "returnType": "json"
+      },
+      "query_period": null,
+      "retrieved_at": "2026-11-15T22:34:47.579163+00:00",
+      "row_count": 100,
+      "snapshot_sha256": "418e2549a6dcd1a8b49cd6fc480e3ea0139109c323252a6d873be9ba9ee4e2f8",
+      "total_count": 786
+    },
+    {
+      "endpoint": "https://apis.data.go.kr/B552584/rwBzentyInfoService/getList",
+      "file": "page-00006.redacted.json",
+      "operation": "getList",
+      "original_response_sha256": "ab1565c7ef54a40d36535af27f44b146599c83f646aab649bd83f9386f084580",
+      "parameters": {
+        "numOfRows": 100,
+        "pageNo": 6,
+        "returnType": "json"
+      },
+      "query_period": null,
+      "retrieved_at": "2026-11-15T22:34:47.907403+00:00",
+      "row_count": 100,
+      "snapshot_sha256": "3ee5e26725773402c61f5634db4a68411fd6ec8711b1bbc5747d5dc0629125cc",
+      "total_count": 786
+    },
+    {
+      "endpoint": "https://apis.data.go.kr/B552584/rwBzentyInfoService/getList",
+      "file": "page-00007.redacted.json",
+      "operation": "getList",
+      "original_response_sha256": "ef10ebe6e50bcc56d513e3d5c86f322c9969d21a6b3753e4990ca250884dfbf9",
+      "parameters": {
+        "numOfRows": 100,
+        "pageNo": 7,
+        "returnType": "json"
+      },
+      "query_period": null,
+      "retrieved_at": "2026-11-15T22:34:48.311249+00:00",
+      "row_count": 100,
+      "snapshot_sha256": "356acc178cad49ddde7ea753adbaeb24efa4e9a2b27cdd2665ef80141b20fefc",
+      "total_count": 786
+    },
+    {
+      "endpoint": "https://apis.data.go.kr/B552584/rwBzentyInfoService/getList",
+      "file": "page-00008.redacted.json",
+      "operation": "getList",
+      "original_response_sha256": "3049b884e7de4a842c3e4f0a1f72283538ac8e2ff9f93721a0bf6017fbd3ad20",
+      "parameters": {
+        "numOfRows": 100,
+        "pageNo": 8,
+        "returnType": "json"
+      },
+      "query_period": null,
+      "retrieved_at": "2026-11-15T22:34:48.612772+00:00",
+      "row_count": 86,
+      "snapshot_sha256": "6a3a02526fa9c959f0cca90cd5fd792db60b423258da38c93f1561506a5e0a1d",
+      "total_count": 786
+    }
+  ],
+  "query_count": 1,
+  "raw_directory": "C:\\Users\\bourb\\Desktop\\HYU\\1-2\\문기인\\RPL\\data\\raw\\public_data\\facilities\\20261115T223446-c71433c0",
+  "record_count": 786,
+  "reference_period": null,
+  "region_filter": null,
+  "region_filter_basis": "registry_administrative_area",
+  "requested_period": null,
+  "response_retention": "public_fields_only_redacted_snapshot_original_bytes_not_saved",
+  "run_id": "20261115T223446-c71433c0",
+  "schema_status": "live_success_verified",
+  "schema_version": "1.0",
+  "source_id": "DATA_GO_15172490",
+  "source_url": "https://www.data.go.kr/data/15172490/openapi.do",
+  "started_at": "2026-11-15T22:34:46.079962+00:00",
+  "status": "complete",
+  "unfiltered_record_count": 786
+}
