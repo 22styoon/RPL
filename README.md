@@ -1,8 +1,10 @@
 # RPL | 분리배출 정책 통계분석 및 시각화
 
-국내외 폐기물 실데이터를 Python으로 수집·정제·분석하고, 질문별 표·그래프·출처·한계를 재현하는 연구 프로젝트입니다. 현재 **독립 분석 9개**를 제공합니다. 기존 정책 계산은 별도의 **가정 기반 민감도 분석**입니다.
+국내외 폐기물 실데이터를 Python으로 수집·정제·분석하고, 질문별 표·그래프·출처·한계를 재현하는 연구 프로젝트입니다. 기본 보고서는 **독립 분석 9개**를 제공합니다. 별도 지역 연구 보고서는 2024년 `R_r/S_r` 표준화와 가중치 민감도를 분석합니다. 기존 정책 계산은 별도의 **가정 기반 민감도 분석**입니다.
 
 [대화형 통계 보고서](outputs/reports/statistical_analysis/index.html) · [개편 결과·검증](docs/statistical_refactor_report_2026-11-16.md) · [분석 사용법](docs/statistical_analysis_guide.md) · [선행연구](docs/literature_review.md)
+
+[시도 표준화 분석 방법](docs/regional_policy_indicator_method.md) · [지역 자료 공백](docs/regional_data_gap_inventory.md) · [기관 자료요청 양식](docs/regional_data_request_template.md)
 
 ## 실행
 
@@ -10,10 +12,13 @@
 
 ```powershell
 .\.venv\Scripts\python run_statistical_analysis.py
+.\.venv\Scripts\python scripts/run_regional_indicator.py --year 2024 --level sido
 .\.venv\Scripts\python -m streamlit run app.py
 ```
 
 웹 화면은 http://localhost:8501 에서 열립니다. 보고서는 outputs/reports/statistical_analysis/index.html을 브라우저에서 직접 열어도 됩니다. 외부 CDN 없이 대화형 그래프를 사용할 수 있습니다.
+
+지역 결과는 `outputs/reports/regional_indicator/index.html`에 생성되고 앱의 **시도 표준화 분석** 메뉴에서도 볼 수 있습니다. R과 S, 재질별 기여도, 기준 가중치, 대안별 점수·순위 민감도, OLS/HC0/HC3 진단을 확인할 수 있습니다.
 
 새 환경:
 
@@ -21,7 +26,18 @@
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
 .\.venv\Scripts\python run_statistical_analysis.py
+.\.venv\Scripts\python scripts/run_regional_indicator.py --year 2024 --level sido
 ```
+
+기본 종합 보고서 실행은 기존 통계 보고서와 별도 지역 분석 보고서를 모두 재생성합니다. 기존 통계 보고서만 필요하면 `run_statistical_analysis.py --skip-regional-indicator`를 사용합니다. 지역 표 원본을 다시 준비하려면 `scripts/prepare_regional_recycling.py --year 2024`를 실행합니다. 수집은 필요할 때만 명시적으로 수행합니다.
+
+```powershell
+.\.venv\Scripts\python scripts/collect_regional_recycling.py --source kr_waste_2024_detail --year 2024 --dry-run
+.\.venv\Scripts\python scripts/collect_regional_recycling.py --source kr_admin_codes_2024 --year 2024 --dry-run
+.\.venv\Scripts\python scripts/join_regional_policy.py --year 2024
+```
+
+`kr_admin_codes_2024` 갱신에는 별도 `MOIS_API_KEY`가 필요합니다. 수거정책 자료는 검증 가능한 원문이 아직 확보되지 않아 자동 수집·결합하지 않습니다. 검증된 정책 후보를 받으면 `data/processed/regional_2024/policy_candidates_unverified.csv`에 근거 필드를 채운 뒤 결합 명령으로 재검증합니다. API 응답·정책 자료의 상태는 [공백 인벤토리](docs/regional_data_gap_inventory.md)에 기록합니다.
 
 ## 현재 분석
 
@@ -30,6 +46,7 @@ python -m venv .venv
 | 국내 발생량은 어떻게 변했는가 | KOSIS 동일 정의 2020~2024 | 추세·증감률·지수·기간 연평균 증감률 |
 | 재질별 처리경로는 어떻게 다른가 | KOSIS 2024 대응 4품목 | 물질재활용·에너지회수·소각·매립·기타 구성 |
 | 지역 간 처리 구성 차이는 어느 정도인가 | 전국 행과 분리한 17개 시도 | 발생량을 분모로 한 처리비율. 인구보정 지표는 미산출 |
+| 재질 구성을 전국 기준으로 맞추면 시도별 비율은 어떻게 달라지는가 | KOSIS 2024 전국 가중치 + 17개 시도 재질별 실측치 | 관측 `R_r`, 표준화 `S_r`, 재질 기여도와 가중치 민감도. 별도 지역 보고서 |
 | 선별 회수량과 잔재는 어떻게 변했는가 | 구로구 2022~2024 행정실적 | 관측 처리 흐름·선별 회수율 |
 | 공개 예산과 처리대상량은 어떻게 변했는가 | 구로구 같은 연도 예산 | 명목 예산 구성·처리대상량당 예산 참고비율 |
 | 시설 명부가 실제로 제공하는 정보는 무엇인가 | 처리시설 API 786행 | 용량·기준연도·지역명 등의 결측률 |

@@ -1,0 +1,10 @@
+reference_year: 2024
+administrative_level: sido
+materials: [폐지류, 폐합성수지류, 폐금속류, 폐유리류]
+baseline_weights: national_generated_mass
+alternatives: [region_mean_shares, equal, leave_one_region_out]
+instability_thresholds:
+  rank_span: 3
+  score_span_pp: 5.0
+minimum_inference_regions: 12
+rounding_tolerance_t: 0.6

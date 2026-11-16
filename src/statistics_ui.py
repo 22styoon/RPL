@@ -8,7 +8,7 @@ import yaml
 from src.model import ROOT
 from src.analysis.pipeline import TITLE
 
-MENU=["국내 통계 현황","지역·재질별 비교","해외 통계 비교","시설 및 비용 분석","가구 시간 분석","선행연구","자료 출처·품질","가정 기반 민감도 분석"]
+MENU=["국내 통계 현황","지역·재질별 비교","시도 표준화 분석","해외 통계 비교","시설 및 비용 분석","가구 시간 분석","선행연구","자료 출처·품질","가정 기반 민감도 분석"]
 REPORT=ROOT/"outputs/reports/statistical_analysis"
 OUTPUT=ROOT/"outputs"
 
@@ -116,12 +116,57 @@ def render_quality(manifest):
         st.rerun()
     st.caption("기본 재생성은 네트워크·인증키를 사용하지 않는다. 원자료 수집은 별도 CLI에서 명시적으로 실행한다.")
 
+def render_regional_indicator():
+    directory=OUTPUT/"reports/regional_indicator"
+    path=directory/"manifest.json"
+    if not path.exists():
+        st.info("지역 표준화 분석 결과가 아직 없습니다.")
+        st.code(r".\.venv\Scripts\python scripts/run_regional_indicator.py --year 2024 --level sido",language="powershell")
+        if st.button("보유 2024 자료로 지역 분석 생성"):
+            from src.analysis.regional_indicator_report import run
+            run();st.rerun()
+        return
+    meta=json.loads(path.read_text(encoding="utf-8"));summary=meta["summary"]
+    st.subheader("2024년 시도별 재질 구성 표준화")
+    st.markdown("지역별 4재질 발생량 비중을 전국 실측 발생량 비중으로 고정해 비교합니다. 정책효과나 최종 재생원료 생산률을 나타내지 않습니다.")
+    columns=st.columns(4)
+    columns[0].metric("시도 관측",f'{summary["sido_rows"]}개')
+    columns[1].metric("시군구 자료 연결",f'{summary["sigungu_verified_rows"]}행')
+    columns[2].metric("검증된 정책",f'{summary["policy_verified_rows"]}건')
+    columns[3].metric("정책·실적 검증 결합",f'{summary["verified_join_rows"]}행')
+    for key,title,table_name in (("scores","관측 R과 표준화 S","scores"),("contributions","재질별 R-S 기여도","contributions"),("weight_sensitivity","가중치 민감도","weight_sensitivity")):
+        figure=artifact_path(f"figures/regional_indicator/{key}.json")
+        st.plotly_chart(pio.read_json(figure),width="stretch",key="regional_indicator_"+key)
+        csv_path=artifact_path(f"tables/regional_indicator/{table_name}.csv")
+        with st.expander(title+" 표·CSV"):
+            st.dataframe(pd.read_csv(csv_path),hide_index=True)
+            st.download_button("CSV 다운로드",csv_path.read_bytes(),csv_path.name,"text/csv",key="regional_download_"+table_name)
+    stability_path=artifact_path("tables/regional_indicator/weight_stability_by_region.csv")
+    if stability_path.exists():
+        with st.expander("시도별 점수·순위 민감 경고"):
+            st.dataframe(pd.read_csv(stability_path),hide_index=True)
+            st.download_button("민감도 경고 CSV",stability_path.read_bytes(),stability_path.name,"text/csv",key="regional_download_stability")
+    with st.expander("보조 회귀·진단 결과"):
+        for name in ("inference_tests","inference_coefficients","inference_vif","inference_diagnostics","inference_leave_one_out"):
+            csv_path=artifact_path(f"tables/regional_indicator/{name}.csv")
+            if csv_path.exists():
+                st.markdown("**"+name+"**")
+                st.dataframe(pd.read_csv(csv_path),hide_index=True)
+                st.download_button(name+" CSV",csv_path.read_bytes(),csv_path.name,"text/csv",key="regional_download_"+name)
+        st.warning("R은 재질 구성과 재질별 처리비율의 산술 결합입니다. 회귀 p값은 지표 타당성이나 정책효과를 증명하지 않습니다.")
+    st.info(f'시군구는 이름·2024년 말 코드가 연결된 {summary["sigungu_verified_rows"]}행입니다. 연중 행정경계 검증과 실제 정책 자료가 없어 정책 결합은 {summary["verified_join_rows"]}행입니다.')
+    for name in ("index.html","report.md"):
+        file=directory/name
+        if file.exists():st.download_button("지역 분석 보고서 "+name,file.read_bytes(),name,"text/html" if name.endswith("html") else "text/markdown",key="regional_report_"+name)
+
 def main():
     st.set_page_config(page_title=TITLE,layout="wide")
     st.title(TITLE)
     st.caption("국내외 실제 통계 · 독립 연구 질문 · 출처와 정의 확인 · Python으로 재현")
     page=st.sidebar.radio("분석 영역",MENU,key="analysis_page")
     manifest=load_manifest()
+    if page=="시도 표준화 분석":
+        render_regional_indicator();return
     if page=="가정 기반 민감도 분석":
         st.info("이 보조 영역은 외생 가정에 따른 비교다. 관측된 정책 인과효과·확정 절감액과 구분한다.")
         from src.model import load_config,household_saving

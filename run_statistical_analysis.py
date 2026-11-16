@@ -11,6 +11,7 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description="RPL 실제 통계 분석·CSV·PNG/SVG·대화형 보고서")
     parser.add_argument("--output-root",type=Path,default=ROOT/"outputs")
     parser.add_argument("--refresh-external",action="store_true",help="분석 전 Eurostat·NEA·EPA 공식 자료 재수집")
+    parser.add_argument("--skip-regional-indicator",action="store_true",help="별도 2024 시도 R/S 표준화 보고서 생성을 생략")
     args=parser.parse_args(argv)
     if args.refresh_external:
         from scripts.collect_international import collect_many
@@ -20,9 +21,14 @@ def main(argv=None):
             return 2
     from src.analysis.pipeline import run
     manifest=run(output_root=args.output_root)
+    regional=None
+    if not args.skip_regional_indicator:
+        from src.analysis.regional_indicator_report import run as run_regional
+        regional=run_regional(output_root=args.output_root)
     print(json.dumps({"status":manifest["status"],"analysis_count":manifest["analysis_count"],
         "report":str(args.output_root/"reports/statistical_analysis/index.html"),
-        "markdown":str(args.output_root/"reports/statistical_analysis/report.md")},ensure_ascii=False,indent=2))
+        "markdown":str(args.output_root/"reports/statistical_analysis/report.md"),
+        "regional_indicator":str(args.output_root/"reports/regional_indicator/index.html") if regional else None},ensure_ascii=False,indent=2))
     return 0
 
 if __name__=="__main__":

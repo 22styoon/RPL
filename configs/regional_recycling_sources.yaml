@@ -1,0 +1,34 @@
+schema_version: "1.0"
+sources:
+  kr_waste_2024_detail:
+    source_url: https://kwaste.or.kr/data/01.php
+    resource_url: https://kwaste.or.kr/lib/fileDownload.php?file_name=1.+2024%EB%85%84+%EC%A0%84%EA%B5%AD+%ED%8F%90%EA%B8%B0%EB%AC%BC+%EB%B0%9C%EC%83%9D+%EB%B0%8F+%EC%B2%98%EB%A6%AC%ED%98%84%ED%99%A9.zip&save_file=attachment_202606291359380.b0d3e82cdc2507f9cd22de0c07272d70.zip
+    resource_id: attachment_202606291359380.b0d3e82cdc2507f9cd22de0c07272d70.zip
+    filename: official_2024.zip
+    source_revision: portal_resource_20260629
+    license: mirror_redistribution_terms_unverified_do_not_publish_raw
+    format: ZIP_XLSX_PDF_HWP
+  kr_sorting_status_2024:
+    source_url: https://www.law.go.kr/LSW/admRulLsInfoP.do?admRulSeq=2100000216235
+    resource_url: https://www.law.go.kr/LSW/admRulLsInfoP.do?admRulSeq=2100000216235
+    resource_id: historical_guideline_20221201
+    filename: guideline_history.html
+    license: public_legal_metadata
+    format: HTML_guideline_only_not_local_policy_return
+  kr_sorting_volume_2024:
+    source_url: https://www.law.go.kr/LSW/admRulLsInfoP.do?admRulSeq=2100000216235
+    resource_url: https://www.law.go.kr/LSW/admRulLsInfoP.do?admRulSeq=2100000216235
+    filename: guideline_history.html
+    license: public_legal_metadata
+    format: HTML_guideline_only_not_2024_volume_return
+  kr_admin_codes_2024:
+    source_url: https://www.data.go.kr/data/15108065/openapi.do
+    resource_url: https://apis.data.go.kr/1741000/admmPpltnHhStus/selectAdmmPpltnHhStus
+    filename: population_codes.json
+    license: no_restrictions_portal_15108065
+    format: JSON_Response_head_items
+    credential: MOIS_API_KEY
+    operation: selectAdmmPpltnHhStus
+    success_code: "0"
+    no_data_code: "3"
+    reference_month: "202412"
