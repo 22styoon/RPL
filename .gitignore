@@ -7,3 +7,6 @@ outputs/
 # 영국 WDI의 조건부 이용허락: 원자료·시설별 행의 공개 재배포 제외
 data/raw/international/uk_waste/
 data/processed/international/uk_waste/
+# Regional raw workbook copies and API response caches are locally reproducible;
+# the source redistribution terms are not yet confirmed.
+data/raw/regional_2024/kr_waste_2024_detail/
