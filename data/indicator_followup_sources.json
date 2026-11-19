@@ -1,0 +1,41 @@
+[
+  {
+    "source_id": "JRC25",
+    "type": "official_research_model",
+    "year": 2025,
+    "title": "Plastics materials flows in the EU-27 and their environmental impacts: Unveiling the European plastic value chain",
+    "authors": "Andrea Amadei; Sara Venturelli; Simone Manfredi",
+    "url": "https://publications.jrc.ec.europa.eu/repository/handle/JRC142860",
+    "locator": "JRC142860 공개 초록; 2025-07-30; DOI 10.2760/6579757. 처분 경로 보충 확인: JRC 공식 보도자료 2025-08-11의 Only a limited percentage of plastic waste is recycled 절, https://joint-research-centre.ec.europa.eu/jrc-news-and-updates/can-plastics-sector-become-more-sustainable-2025-08-11_en",
+    "verified": "official_public_abstract_and_official_news_selected_sections",
+    "contribution": "2022년 EU-27 플라스틱 가치사슬 MFA는 적정 수거율 86%와 폐기 후 재활용률 19.6%를 별개 지표로 보고한다. 수거에는 재활용 외 처분 경로도 있어 수거율을 최종 회수율로 볼 수 없다.",
+    "limitation": "9개 부문·15개 고분자를 다루는 기관 모형 추정이다. 개별 국가의 municipal 건식 바스켓 H/S 실측값이 아니다. 공개 초록·공식 보도자료를 확인했으며 보고서 전체의 수지와 세부 분모는 아직 감사하지 않았다. 두 비율의 차이나 몫을 선별·재생 공정손실 또는 공정수율로 계산하지 않는다.",
+    "accessed": "2026-11-19"
+  },
+  {
+    "source_id": "SETH18",
+    "type": "peer_reviewed_method",
+    "year": 2018,
+    "title": "Composite indices, alternative weights, and comparison robustness",
+    "authors": "Suman Seth; Mark McGillivray",
+    "url": "https://link.springer.com/article/10.1007/s00355-018-1132-6",
+    "locator": "Abstract; sections 2–5 and 7; Social Choice and Welfare 51, 657–679; published 2018-06-05; DOI 10.1007/s00355-018-1132-6",
+    "verified": "publisher_full_text_selected_sections",
+    "contribution": "선형 종합지표에서 각 성분 가중치의 허용 상한·하한을 명시하고 그 집합 전체에 대해 쌍별 비교의 견고성을 확인하는 방법을 제시한다. 몇 가지 대안 가중치에서 순서가 같다는 사실과 허용 집합 전체에서 순서가 유지된다는 주장을 구분하도록 뒷받침한다.",
+    "limitation": "가중치 허용 범위에는 합의나 목적에 대한 규범적 근거가 필요하다. 이 논문의 HDI 적용은 재활용 지표의 경험적 타당성 또는 정책 인과효과를 검증한 결과가 아니다. 모든 비음수 가중치를 허용하는 극단 시나리오를 보편적으로 합리적인 정책 가중치로 정당화하지 않는다.",
+    "accessed": "2026-11-19"
+  },
+  {
+    "source_id": "EUROSTAT26",
+    "type": "official_statistics_release",
+    "year": 2026,
+    "title": "Waste generation in the EU: 1 697 kg per capita in 2024",
+    "authors": "Eurostat",
+    "url": "https://ec.europa.eu/eurostat/en/web/products-eurostat-news/w/ddn-20261029-2",
+    "locator": "2026-10-29 release; 42% of EU waste was recycled in 2024 section; Methodological note; source datasets env_wasgen and env_wastrt",
+    "verified": "official_release_full_selected_sections",
+    "contribution": "2024년 EU 폐기물 처리 구성에서 재활용 42.0%는 전체 처리량을 분모로 한 값이다. 방법 주석은 처리 통계가 수입분을 포함하고 수출분을 제외하므로 발생 통계와 직접 대응하지 않음을 명시한다.",
+    "limitation": "전체 폐기물 처리경로 비중이며 municipal 발생량을 분모로 한 최종 재생물질 회수율이 아니다. 발생국 기준 H/S와 비교하려면 범위·분모·교역 귀속을 별도로 조화해야 한다. 본 항목은 정의 검토 근거이며 새 국가 비교값으로 분석표에 혼합하지 않는다.",
+    "accessed": "2026-11-19"
+  }
+]

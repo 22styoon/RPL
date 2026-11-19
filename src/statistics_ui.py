@@ -8,7 +8,7 @@ import yaml
 from src.model import ROOT
 from src.analysis.pipeline import TITLE
 
-MENU=["국내 통계 현황","지역·재질별 비교","시도 표준화 분석","해외 통계 비교","시설 및 비용 분석","가구 시간 분석","선행연구","자료 출처·품질","가정 기반 민감도 분석"]
+MENU=["국내 통계 현황","재활용 지표 연구","지역·재질별 비교","시도 표준화 분석","해외 통계 비교","시설 및 비용 분석","가구 시간 분석","선행연구","자료 출처·품질","가정 기반 민감도 분석"]
 REPORT=ROOT/"outputs/reports/statistical_analysis"
 OUTPUT=ROOT/"outputs"
 
@@ -195,12 +195,95 @@ def render_regional_indicator():
         file=directory/name
         if file.exists():st.download_button("지역 분석 보고서 "+name,file.read_bytes(),name,"text/html" if name.endswith("html") else "text/markdown",key="regional_report_"+name)
 
+def render_recycling_indicator():
+    st.subheader("재활용률의 국제 비교: 지표 설계와 근거")
+    directory=OUTPUT/"reports/recycling_indicator"
+    manifest_path=directory/"manifest.json"
+    if not manifest_path.exists():
+        st.info("선행연구·실측 통계·설명 사례로 지표 연구 보고서를 생성합니다.")
+        st.code(r".\.venv\Scripts\python scripts/run_recycling_indicator.py",language="powershell")
+        if st.button("보유 자료로 지표 연구 보고서 생성",key="build_recycling_indicator"):
+            from src.analysis.recycling_indicator_report import run
+            run();st.rerun()
+        return
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    summary=manifest["summary"]
+    columns=st.columns(3)
+    columns[0].metric("학술·공식·방법 근거",f'{summary["source_items"]}항목')
+    columns[1].metric("에너지회수 포함/제외 차이",f'{summary["kosis_energy_gap_pp"]:.2f}%p')
+    columns[2].metric("시도 구성 표준화 차이 최대",f'{summary["maximum_composition_gap_pp"]:.2f}%p')
+    st.caption("수치 카드: KOSIS 2024 대응 4재질 처리량 기준. 최종 재생원료 산출률·정책효과와 구분합니다.")
+    st.markdown("**H**는 같은 범위·원산지·발생연도의 폐기물에서 얻은 최종 재생물질의 비율입니다. **S**는 재질 구성을 공통 가중치로 고정한 비교값입니다.")
+    st.latex(r"H=100\frac{\sum_m F_m}{\sum_m G_m},\qquad S=100\sum_m w_m^*\frac{F_m}{G_m}")
+    st.info("현재 국내 자료는 처리량입니다. 새 최종 H/S 국가값과 특정 정책의 인과효과는 아직 식별되지 않았습니다. 아래 실측 그림과 가상 설명을 구분해 확인하세요.")
+    st.caption("0.2·0.3·0.5는 한국 EPR 의무율 산정용 과거 실적 가중치입니다. 통상 의무율 산정연도 t에서 t−4·t−3·t−2에 적용하며 국가 연간 실적률의 보편 산식과 다릅니다.")
+    from src.analysis.recycling_indicator_report import CHARTS
+    actual,robust,examples=st.tabs(["실제 통계·문헌·기관 모형","가중치 범위 전체의 비교","지표 작동 설명·인과 경로"])
+    for container,names in [(actual,["swiss_stages","nea_scope","kosis_energy","regional_scores","jrc_plastics"]),
+                            (robust,["weight_pair_counts","weight_pair_matrix"]),
+                            (examples,["composition_example","time_methods","partial_bounds","mass_flow"])]:
+        with container:
+            for name in names:
+                _,title,label,note,_=CHARTS[name]
+                st.markdown("**"+title+"**");st.caption(label)
+                figure=artifact_path(f"figures/recycling_indicator/{name}.json")
+                if not figure.exists():
+                    st.info("이 그림은 2026-11-19 후속 보고서를 재생성하면 표시됩니다.")
+                    continue
+                st.plotly_chart(pio.read_json(figure),width="stretch",key="indicator_"+name)
+                st.write(note)
+                with st.expander("수치 CSV·발표용 PNG/SVG"):
+                    for extension,folder,mime in [("csv","tables","text/csv"),("png","figures","image/png"),("svg","figures","image/svg+xml")]:
+                        path=artifact_path(f"{folder}/recycling_indicator/{name}.{extension}")
+                        st.download_button(extension.upper(),path.read_bytes(),path.name,mime,key="indicator_"+name+extension)
+        if container is examples:
+            with container:
+                st.image(str(artifact_path("figures/recycling_indicator/causal_dag.png")),caption="인과 가설. 지역·시장 여건의 교란은 구성 표준화만으로 제거되지 않습니다.")
+    with robust:
+        st.caption("모든 비교에서 두 지역에 같은 가중치를 적용합니다. 허용 집합은 민감도 시나리오이며 확률분포나 합의된 최적 가중치가 아닙니다. 비음수 전체 검토에는 가중치 0의 극단도 포함합니다.")
+        counts_path=artifact_path("tables/recycling_indicator/weight_pair_counts.csv")
+        if counts_path.exists():
+            counts=pd.read_csv(counts_path)
+            st.dataframe(counts[["가중치 범위","pair_count","nonreversal_pairs","indeterminate_pairs"]].rename(columns={"pair_count":"전체 지역쌍","nonreversal_pairs":"방향 유지","indeterminate_pairs":"역전 가능"}),hide_index=True)
+            selected=st.selectbox("비교할 가중치 허용 범위",counts["가중치 범위"].tolist(),key="indicator_weight_domain")
+            domain=counts.loc[counts["가중치 범위"].eq(selected),"domain"].iloc[0]
+            pairs=pd.read_csv(artifact_path("tables/recycling_indicator/weight_comparisons.csv"))
+            pairs=pairs.loc[pairs.domain.eq(domain)]
+            display_pairs=pairs[["entity_a","entity_b","gap_lower_pp","gap_upper_pp","comparison"]].copy()
+            display_pairs["comparison"]=display_pairs.comparison.map({"a_strict":"A가 항상 높음","b_strict":"B가 항상 높음","a_no_reversal":"A가 낮아지지 않음·동점 가능","b_no_reversal":"B가 낮아지지 않음·동점 가능","tie":"항상 동점","indeterminate":"우열이 달라질 수 있음"})
+            st.dataframe(display_pairs.rename(columns={"entity_a":"지역 A","entity_b":"지역 B","gap_lower_pp":"A−B 최소차(%p)","gap_upper_pp":"A−B 최대차(%p)","comparison":"비교 분류"}),hide_index=True)
+            with st.expander("비교를 재현하는 가중치·순위 외곽 범위"):
+                pair_labels=[f'{row.entity_a} / {row.entity_b}' for row in pairs.itertuples()]
+                chosen=st.selectbox("극값 가중치를 확인할 지역쌍",pair_labels,key="indicator_weight_pair")
+                pair=pairs.iloc[pair_labels.index(chosen)]
+                witness=pd.read_csv(artifact_path("tables/recycling_indicator/weight_witnesses.csv"))
+                witness=witness.loc[witness.domain.eq(domain)&witness.entity_a.eq(pair.entity_a)&witness.entity_b.eq(pair.entity_b)]
+                witness=witness.copy();witness["endpoint"]=witness.endpoint.map({"lower":"A−B 최소차","upper":"A−B 최대차"})
+                st.dataframe(witness[["endpoint","material","weight","rate_a","rate_b","gap_contribution_pp"]].rename(columns={"endpoint":"극값 방향","material":"재질","weight":"공통 가중치","rate_a":"A 처리비율(0–1)","rate_b":"B 처리비율(0–1)","gap_contribution_pp":"차이 기여도(%p)"}),hide_index=True)
+                ranks=pd.read_csv(artifact_path("tables/recycling_indicator/weight_rank_outer.csv"))
+                st.dataframe(ranks.loc[ranks.domain.eq(domain),["entity","rank_lower_outer","rank_upper_outer","score_lower_pct","score_upper_pct"]].rename(columns={"entity":"시도","rank_lower_outer":"순위 외곽 하한","rank_upper_outer":"순위 외곽 상한","score_lower_pct":"점수 하한(%)","score_upper_pct":"점수 상한(%)"}),hide_index=True)
+                st.caption("순위는 쌍별 보장에서 얻은 보수적 외곽 범위입니다. 양 끝 순위가 실제 하나의 가중치에서 달성된다는 보장은 없으며 신뢰구간이 아닙니다.")
+                for name in ("weight_comparisons","weight_witnesses","weight_rank_outer","weight_reference_vertices","weight_domain_bounds"):
+                    path=artifact_path(f"tables/recycling_indicator/{name}.csv")
+                    st.download_button(name+" CSV",path.read_bytes(),path.name,"text/csv",key="indicator_download_"+name)
+    with st.expander("전체 연구·근거·독립 검증 계획"):
+        st.markdown("측정 경계 감사 → 독립 최종 산출과의 일치 → 국가·가중치 민감도 → 정책 패널 인과분석 → 환경·비용 검증 순서로 진행합니다. 산식의 단조성·구성 불변성은 프로그램으로 검증하며 정책 인과효과는 추가 식별이 필요합니다.")
+        sources=pd.read_csv(artifact_path("tables/recycling_indicator/sources.csv"))
+        st.dataframe(sources[["source_id","title","year","verified","contribution","limitation"]],hide_index=True)
+    for filename,label,mime in [("index.html","대화형 연구 보고서 HTML","text/html"),("study.md","초기 연구 논증 Markdown","text/markdown"),("weight_robustness.md","가중치 후속 논증 Markdown","text/markdown"),("followup_evidence.md","추가 근거 확인 Markdown","text/markdown"),("sources.json","출처·확인 범위 JSON","application/json")]:
+        path=directory/filename
+        if path.exists():
+            st.download_button(label,path.read_bytes(),filename,mime,key="indicator_report_"+filename)
+
+
 def main():
     st.set_page_config(page_title=TITLE,layout="wide")
     st.title(TITLE)
     st.caption("국내외 실제 통계 · 독립 연구 질문 · 출처와 정의 확인 · Python으로 재현")
     page=st.sidebar.radio("분석 영역",MENU,key="analysis_page")
     manifest=load_manifest()
+    if page=="재활용 지표 연구":
+        render_recycling_indicator();return
     if page=="시도 표준화 분석":
         render_regional_indicator();return
     if page=="가정 기반 민감도 분석":

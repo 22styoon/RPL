@@ -3,6 +3,13 @@ import pandas as pd
 
 from .boundary_audit import ALIASES as MOIS_SIDO_ALIASES
 
+GEOGRAPHY_FIELDS = (
+    "matched_sido_name_2024", "matched_sido_code_2024",
+    "matched_sigungu_name_2024", "matched_sigungu_code_2024",
+    "code_reference_month", "geography_match_status",
+    "waste_statistical_unit_2024", "geography_source_locator",
+)
+
 
 def _sido_lookup(codes):
     rows = codes.dropna(subset=["sido_name", "sido_code"])
@@ -78,7 +85,8 @@ def link_ordinance_geography(candidates, codes, waste_units):
     sido_codes = _sido_lookup(codes)
     linked = candidates.copy()
     geography = pd.DataFrame([_resolve_locality(row.locality, codes, waste_codes, sido_codes)
-                              for row in linked.itertuples(index=False)], index=linked.index)
+                              for row in linked.itertuples(index=False)], index=linked.index,
+                             columns=GEOGRAPHY_FIELDS)
     linked = pd.concat([linked, geography], axis=1)
     status_counts = linked.geography_match_status.value_counts().sort_index().to_dict()
     summary = {

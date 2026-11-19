@@ -124,7 +124,8 @@ def _fetch_json(endpoint, params, oc, *, timeout=30, referer=""):
             if any(key.lower() == "oc" for key, _ in pairs):
                 pairs = [(key, item) for key, item in pairs if key.lower() != "oc"]
                 value = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(pairs), parts.fragment))
-            value = re.sub(r"\bOC=[^&\"'<>\\s]*", "OC=[REDACTED]", value, flags=re.IGNORECASE)
+            value = re.sub(r'''\bOC\s*=\s*(?:"[^"]*"|'[^']*'|[^&"'<>\s]*)''',
+                           "OC=[REDACTED]", value, flags=re.IGNORECASE)
         return value
     payload = redact(payload)
     safe_raw = (json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
@@ -157,9 +158,37 @@ def _normalize_record(record, keyword, page_file, retrieved_at):
         "source_locator": locator,
         "raw_list_page": page_file,
         "detail_raw_file": "",
+        "detail_status": "not_requested",
         "candidate_status": "ordinance_history_only_operational_policy_unverified",
         "retrieved_at": retrieved_at,
     }
+
+
+def _validate_detail(payload, candidate):
+    """Validate documented fields without assuming an undocumented JSON wrapper.
+
+    Field names: open.law.go.kr/LSO/openApi/guideResult.do?htmlName=ordinInfoGuide.
+    Matching legal identity and body text confirms a retrieved ordinance
+    document, never implementation or exposure of an operational policy.
+    """
+    if not isinstance(payload, (dict, list)):
+        raise ValueError("LAW_API_DETAIL_SCHEMA_CHANGED")
+    nodes = [node for node in _walk(payload) if isinstance(node, dict)]
+    if any(str(key).lower() in {"error", "errormsg", "errormessage"}
+           and value not in (None, "", False, 0) for node in nodes for key, value in node.items()):
+        raise ValueError("LAW_API_AUTH_OR_SERVICE_ERROR")
+    identities = [node for node in nodes if _get(node, "name") and (_get(node, "serial") or _get(node, "id"))]
+    if not identities:
+        raise ValueError("LAW_API_DETAIL_IDENTITY_MISSING")
+    expected_serial = str(candidate.get("ordinance_serial") or "").strip()
+    expected_id = str(candidate.get("ordinance_id") or "").strip()
+    if not any((not expected_serial or _get(node, "serial") == expected_serial)
+               and (not expected_id or _get(node, "id") == expected_id) for node in identities):
+        raise ValueError("LAW_API_DETAIL_IDENTITY_MISMATCH")
+    content_fields = {"조내용", "부칙내용", "개정문내용", "제개정이유내용"}
+    if not any(key in content_fields and isinstance(value, str) and value.strip()
+               for node in nodes for key, value in node.items()):
+        raise ValueError("LAW_API_DETAIL_BODY_UNVERIFIED")
 
 
 def collect_ordinances(*, root=ROOT, keywords=DEFAULT_KEYWORDS, limit_pages=30, detail_budget=0,
@@ -172,13 +201,23 @@ def collect_ordinances(*, root=ROOT, keywords=DEFAULT_KEYWORDS, limit_pages=30, 
     root = Path(root).resolve()
     oc = load_law_oc(root)
     referer = load_law_domain(root)
+    request_scope = {
+        "target": "ordin", "history_mode": True, "search": 1, "display": 100,
+        "keywords": list(terms), "effective_date_filter": DATE_RANGE,
+        "page_budget": limit_pages, "detail_budget": detail_budget,
+        "detail_validation_version": 1,
+    }
     source_root = root / "data/raw/regional_2024/law_ordinances"
     prior = sorted(path for path in source_root.iterdir() if path.is_dir()) if source_root.exists() else []
     if prior and not refresh:
         cached_manifest = prior[-1] / "manifest.json"
         candidate_csv = root / "data/processed/regional_2024/policy_ordinance_candidates.csv"
         if cached_manifest.exists() and candidate_csv.exists():
-            return json.loads(cached_manifest.read_text(encoding="utf-8"))
+            cached = json.loads(cached_manifest.read_text(encoding="utf-8"))
+            if (cached.get("status") == "complete_within_page_budget"
+                    and cached.get("request_scope") == request_scope
+                    and cached.get("candidate_sha256") == hashlib.sha256(candidate_csv.read_bytes()).hexdigest()):
+                return cached
     run_id = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y%m%dT%H%M%S_%f")
     run_dir = source_root / run_id
     pages_dir, details_dir = run_dir / "pages", run_dir / "details"
@@ -231,19 +270,32 @@ def collect_ordinances(*, root=ROOT, keywords=DEFAULT_KEYWORDS, limit_pages=30, 
     candidates = list(rows_by_id.values())
     details_dir.mkdir(parents=True, exist_ok=True)
     details_received = 0
+    details_rejected = 0
     for row in candidates[:detail_budget]:
         params = {"target": "ordin", "type": "JSON"}
         if row["ordinance_serial"]:
             params["MST"] = row["ordinance_serial"]
         else:
             params["ID"] = row["ordinance_id"]
-        raw, payload = _fetch_json(LAW_SERVICE_ENDPOINT, params, oc, timeout=timeout, referer=referer)
-        if not isinstance(payload, (dict, list)):
-            raise ValueError("LAW_API_DETAIL_SCHEMA_CHANGED")
+        try:
+            raw, payload = _fetch_json(LAW_SERVICE_ENDPOINT, params, oc, timeout=timeout, referer=referer)
+            _validate_detail(payload, row)
+        except ValueError as error:
+            # Error JSON and unknown detail shapes are not ordinance evidence.
+            # Preserve the list candidate but do not persist/count a detail body.
+            row["detail_status"] = str(error)
+            details_rejected += 1
+            request_log.append({"parameters": params, "result": "detail_rejected",
+                                "record_count": 0, "error_code": str(error),
+                                "ordinance_serial": row["ordinance_serial"]})
+            if delay_seconds:
+                sleep(delay_seconds)
+            continue
         detail_id = re.sub(r"[^A-Za-z0-9_-]", "_", row["ordinance_serial"] or row["ordinance_id"])
         path = details_dir / f"{detail_id}.json"
         path.write_bytes(raw)
         row["detail_raw_file"] = path.relative_to(root).as_posix()
+        row["detail_status"] = "document_identity_and_body_validated_operational_policy_unverified"
         request_log.append({"parameters": params, "sha256": hashlib.sha256(raw).hexdigest(),
                             "raw_file": row["detail_raw_file"], "record_count": 1,
                             "ordinance_serial": row["ordinance_serial"]})
@@ -255,7 +307,7 @@ def collect_ordinances(*, root=ROOT, keywords=DEFAULT_KEYWORDS, limit_pages=30, 
     candidate_path.parent.mkdir(parents=True, exist_ok=True)
     columns = ["ordinance_id", "ordinance_serial", "policy_name", "promulgation_date", "effective_date",
                "amendment_type", "locality", "ordinance_type", "searched_terms", "source_url", "source_locator",
-               "raw_list_page", "detail_raw_file", "candidate_status", "retrieved_at"]
+               "raw_list_page", "detail_raw_file", "detail_status", "candidate_status", "retrieved_at"]
     pd.DataFrame(candidates, columns=columns).to_csv(candidate_path, index=False, encoding="utf-8-sig")
     manifest = {
         "source_id": "lawgo_ordinance_history",
@@ -264,11 +316,16 @@ def collect_ordinances(*, root=ROOT, keywords=DEFAULT_KEYWORDS, limit_pages=30, 
         "effective_date_filter": DATE_RANGE,
         "history_mode": True,
         "retrieved_at": retrieved_at,
-        "status": "complete_within_page_budget" if not stopped_by_budget else "partial_page_budget_reached",
+        "status": ("partial_page_budget_reached" if stopped_by_budget
+                   else "partial_detail_validation_failed" if details_rejected else "complete_within_page_budget"),
         "pages_used": pages_used,
         "detail_count": details_received,
+        "detail_rejected_count": details_rejected,
+        "detail_validation": "documented legal identity and body fields; operational policy remains unverified",
         "candidate_count": len(candidates),
         "candidate_csv": candidate_path.relative_to(root).as_posix(),
+        "candidate_sha256": hashlib.sha256(candidate_path.read_bytes()).hexdigest(),
+        "request_scope": request_scope,
         "limitation": "ordinance text is a legal source candidate; it does not establish implementation, coverage, operating method, or outcome",
         "credential_handling": "OC query parameter redacted from locally stored response JSON and source links",
         "requests": request_log,

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RPL · $title</title>
+<style>
+:root{--ink:#19343d;--teal:#25657d;--accent:#b87835;--paper:#faf9f6;--line:#d9dfda}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.85 "Malgun Gothic","Apple SD Gothic Neo",sans-serif}header,main,footer{max-width:1180px;margin:auto;padding:32px}header{padding-top:72px;border-top:8px solid var(--teal)}.eyebrow{font-size:12px;font-weight:700;letter-spacing:1.2px;color:var(--teal)}h1{font-size:clamp(32px,5vw,57px);line-height:1.3;letter-spacing:-2px;max-width:950px;margin:20px 0}h2{font-size:27px;line-height:1.5;letter-spacing:-.7px}h3{font-size:19px;line-height:1.55}.lead{max-width:900px;font-size:20px}.muted,figcaption{color:#5c7075;font-size:13px}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:30px 0}.card{background:#eaf0ed;padding:22px;border-top:3px solid var(--teal)}.card strong{display:block;font-size:34px;line-height:1.5}.card small{display:block;color:#51686d}nav{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}nav a{border:1px solid var(--line);padding:5px 14px;text-decoration:none}.section,section.chart{background:white;margin:28px 0;padding:32px;border:1px solid var(--line);border-radius:3px;overflow:hidden}a{color:var(--teal);text-underline-offset:3px}.formula{padding:22px;background:#edf3f1;border-left:4px solid var(--teal);font:16px/2.1 Consolas,"Malgun Gothic",monospace;overflow:auto}.notice{padding:20px 24px;background:#f6efdf;border-left:4px solid var(--accent);margin:22px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}.source{padding:20px 0;border-bottom:1px solid var(--line);break-inside:avoid}.source h3{margin:7px 0}.source p{margin:6px 0}table{border-collapse:collapse;font-size:12px;display:block;overflow:auto;max-height:520px}td,th{padding:8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}summary{cursor:pointer;color:var(--teal);font-weight:600}details{margin-top:20px}img{width:100%;height:auto}.steps li{margin:12px 0}.plotly-graph-div{max-width:100%}footer{font-size:13px;border-top:1px solid var(--line);color:#5c7075}@media(max-width:700px){header,main,footer{padding:20px}header{padding-top:40px}.cards,.grid{grid-template-columns:1fr}.section,section.chart{padding:19px}h1{letter-spacing:-1px}}@media print{body{background:white;font-size:11pt}header,main,footer{max-width:none;padding:16px}nav{display:none}.section,section.chart{border:none;padding:16px 0}.source{break-inside:avoid}a{color:inherit}details{display:block}.plotly-graph-div{break-inside:avoid}h2{break-after:avoid}}
+</style>
+</head>
+<body>
+<header>
+<p class="eyebrow">RPL RESEARCH · MEASUREMENT BEFORE RANKING · V1.1 / 2026.11.19</p>
+<h1>$title</h1>
+<p class="lead">범위와 공정을 맞추고, 재질 구성을 고정한 뒤 비교한다.<br>선행연구에서 출발한 <strong>최종 물질회수 지표 H/S</strong>의 설계와 검증.</p>
+<p>기존 지표의 높은 값이 실제 재생원료 증가를 뜻하는지 확인하기 위해, 공식 정의와 물질흐름 연구를 대조했다. 아래에서는 실제 통계·문헌 사례·가상 설명을 각각 표시한다.</p>
+<div class="cards">
+<div class="card"><small>검토한 학술·공식·방법 근거</small><strong>$source_count 항목</strong><small>목적 중심 검토 · 전수 체계적 고찰 아님</small></div>
+<div class="card"><small>한국 2024 · 대응 4재질</small><strong>$energy_gap %p</strong><small>에너지회수 포함/제외의 처리비율 차이</small></div>
+<div class="card"><small>같은 시도, 재질 구성 표준화</small><strong>최대 $composition_gap %p</strong><small>관측 R과 표준화 S의 차이 · 정책효과 아님</small></div>
+</div>
+<nav aria-label="목차"><a href="#argument">연구의 논지</a><a href="#method">지표 설계</a><a href="#robustness">가중치 전체 검증</a><a href="#evidence">12개 시각화</a><a href="#validity">정당성과 인과</a><a href="#next">검증 설계</a><a href="#literature">선행연구·공식 근거</a></nav>
+<p class="muted">생성 $generated · <a href="study.md">초기 연구 논증</a> · <a href="weight_robustness.md">2026-11-19 가중치 후속 논증</a> · <a href="followup_evidence.md">추가 근거 확인</a> · <a href="data_contract.md">입력 계약</a> · <a href="sources.json">근거 원장 JSON</a> · <a href="manifest.json">파일 해시·재현 기록</a></p>
+</header>
+<main>
+<section id="argument" class="section">
+<p class="eyebrow">01 / RESEARCH QUESTION</p>
+<h2>재활용률의 차이에는 성과 차이와 측정 차이가 섞여 있다</h2>
+<p>총 발생량에 건설폐기물을 넣는지, 선별시설 반입을 재활용으로 세는지, 공정 손실을 제외하는지에 따라 같은 이름의 비율이 달라진다. 재질 구성까지 다르면 금속이 많은 국가와 플라스틱이 많은 국가의 총률은 서로 다른 난도를 반영한다. 따라서 공정한 비교에는 공통 산식과 함께 <strong>공통 측정 경계</strong>가 필요하다.</p>
+<div class="grid"><div><h3>선행연구가 확인한 문제</h3><p><a href="#source-HAUPT17">Haupt 외(2017)</a>는 수거와 재생자원 산출의 차이를 실제 물질흐름으로 보여준다. <a href="#source-GRAEDEL11">Graedel 외(2011)</a>는 재활용 지표별 분모를 구분한다. <a href="#source-MORAGA19">Moraga 외(2019)</a>와 <a href="#source-SAIDANI19">Saidani 외(2019)</a>는 지표의 목적과 범위를 먼저 명확히 할 필요를 뒷받침한다.</p></div><div><h3>이 연구가 추가하는 설계</h3><p>발생국·발생연도·재질·최종 산출을 일치시키고, 실제 구성 H와 고정 구성 S를 함께 보고한다. 수출 추적이 없거나 최종 산출을 모르면 결측을 보존하고 가능한 범위를 제시한다. 가중치의 선택과 관측 범위도 결과의 일부다.</p></div></div>
+<div class="notice"><strong>한국의 0.2·0.3·0.5를 정확히 적용하기</strong><p><a href="#source-KR_EPR">시행령 별표 5</a>의 가중치는 제품·포장재 EPR <strong>재활용의무율 설정</strong>을 위한 실적 평균이다. 통상 의무율 산정연도 t에서 t−2·t−3·t−4 실적에 0.5·0.3·0.2를 적용하며 목표 반영과 조정 요소가 더해진다. 국가 생활폐기물 연간 실적률 전체에 적용하는 보편 평활 산식으로 설명할 수 없다.</p></div>
+</section>
+
+<section id="method" class="section">
+<p class="eyebrow">02 / PROPOSED MEASUREMENT CONTRACT</p>
+<h2>최종 회수율 H와 재질 구성 표준화 S를 함께 제시한다</h2>
+<p>G는 국내에서 발생한 대상 재질의 양, F는 그 폐기물에서 얻은 규격을 충족하는 최종 재생물질량이다. 무수 대상물질 기준으로 오염물·외부 첨가물·공정 잔재·연료 및 에너지회수를 분리한다. 시범 바스켓은 종이·플라스틱·금속·유리의 공통 대응 범주다. 이 부분집합을 전체 국가 재활용률이라고 부르지 않는다.</p>
+<div class="formula">h<sub>itm</sub> = F<sub>itm</sub> / G<sub>itm</sub><br>H<sub>it</sub> = 100 × ΣF<sub>itm</sub> / ΣG<sub>itm</sub><br>S<sub>it</sub>(w*) = 100 × Σw*<sub>m</sub> h<sub>itm</sub>　;　Σw*<sub>m</sub> = 1</div>
+<p><strong>H</strong>는 실제 폐기물 구성에서 회수한 비율이다. <strong>S</strong>는 모든 국가가 같은 재질 구성을 가졌을 때 관측된 재질별 회수율로 회수할 비교값이다. S는 실제 총물량 비율과 다르다. 공정 수율 F/I, 1인당 발생량, 원료 대체, 환경·비용 결과는 별도 지표로 공개한다.</p>
+<ul class="steps">
+<li><strong>같은 범위·분모:</strong> Municipal과 산업·건설해체를 구분하고, 대상 재질 자체의 발생량을 분모로 쓴다. 한국·싱가포르의 현재 원표를 이름만 바꾸어 공통 자료로 만들 수 없다.</li>
+<li><strong>같은 산출 단계:</strong> 수거량이나 선별 반출량을 최종 산출로 간주하지 않는다. <a href="#source-EU_CALC">EU 계산지점</a>은 재질별 공정 투입 지점 등을 포함하므로 본 최종 산출 규약과 동일하다고 단정하지 않는다.</li>
+<li><strong>발생국·코호트 귀속:</strong> 국내 발생분의 국내/국외 최종 산출을 합하고, 수입분은 제외한다. 수출 신고량 전부를 최종 회수량으로 세지 않는다. 전년도 재고 처리량과 올해 발생량을 무심코 나누지 않는다.</li>
+<li><strong>가중치 사전 고정:</strong> 국제 적용에서는 감사된 기준연도 대상국 발생비중을 후보로 두고, 국가 비중 평균·재질 균등을 대안으로 공개한다. 현재 국내 그림의 전국 가중치를 세계 표준으로 주장하지 않는다. <a href="#source-OECD08">가중치 민감도 원칙</a>.</li>
+<li><strong>기간을 통일:</strong> 연간 본값에 더해, 3년 안정화 값은 재질별 F와 G를 먼저 합한 뒤 공통 w를 적용한다. 연간 비율 평균이나 EPR 목표 산식과 다른 질문을 답한다.</li>
+<li><strong>미확인은 구간:</strong> F가 미확인이면 물리적 제약 0≤F≤G와 추가 증빙으로 하한/상한을 구한다. 관측된 재질만 다시 100%로 맞추지 않는다. G가 없거나 0이면 바스켓 비교를 재검토한다.</li>
+</ul>
+<div class="notice"><strong>현재 관측 가능한 범위</strong><p>국내 2024년 17개 시도의 R/S는 <strong>물질재활용 처리량</strong> 기준이다. 최종 산출 F가 확보되지 않아 새 H/S의 실제 국가값은 미식별이다. 아래는 지표의 필요성과 작동 원리를 검증하는 자료이며 확정된 국제 최종률 순위표가 아니다.</p></div>
+</section>
+
+<section id="robustness" class="section">
+<p class="eyebrow">03 / COMMON-WEIGHT ROBUSTNESS · 2026-11-19 추가</p>
+<h2>가중치 몇 가지의 일치와 허용 범위 전체의 보장을 구분한다</h2>
+<p>전국 발생비중·시도별 재질 비중 평균·재질 균등의 세 가중치에서 비교 방향이 같아도, 그 가중치들이 정의하는 더 넓은 범위까지 같은 결과라고 단정할 수 없다. <a href="#source-SETH18">Seth·McGillivray(2018)</a>를 근거로 허용 집합을 먼저 선언하고 두 지역에 <strong>동일한 공통 가중치</strong>를 적용한 점수 차이의 최솟값과 최댓값을 계산한다.</p>
+<div class="formula">d<sub>AB</sub>(w) = 100Σw<sub>m</sub>(p<sub>Am</sub> − p<sub>Bm</sub>)<br>d<sup>−</sup> = min<sub>w∈W</sub>d<sub>AB</sub>(w),　d<sup>+</sup> = max<sub>w∈W</sub>d<sub>AB</sub>(w)</div>
+<p>하한이 양수면 A가, 상한이 음수면 B가 모든 허용 가중치에서 높다. 양·음수가 모두 가능하면 그 집합에서 우열이 뒤집힐 수 있다. 지역별 점수 구간을 서로 다른 가중치로 따로 계산한 뒤 비교하는 방법보다, 같은 w의 차이를 직접 최적화하는 것이 이 질문에 맞는다.</p>
+<div class="cards"><div class="card"><small>세 기준 가중치의 모든 볼록혼합</small><strong>$hull_pairs / 136쌍</strong><small>비교 방향 유지</small></div><div class="card"><small>재질별 최소·최대 + 합계 1의 전체 집합</small><strong>$box_pairs / 136쌍</strong><small>비교 방향 유지</small></div><div class="card"><small>비음수 공통 가중치 전체</small><strong>$simplex_pairs / 136쌍</strong><small>보수적 극단 검토에서 방향 유지</small></div></div>
+<p>세 집합은 차례로 포함 관계다. 비음수 전체 집합은 0과 한 재질에 전부 배정하는 극단도 포함한 닫힌 집합으로 검증한다. 이 극단을 정책적으로 바람직한 기본 가중치로 권하는 것은 아니다. 상·하한 역시 합의된 객관적 참값이 아니라 공개한 민감도 시나리오다.</p>
+<p><a href="../../tables/recycling_indicator/weight_comparisons.csv">모든 쌍의 점수 차이 구간</a> · <a href="../../tables/recycling_indicator/weight_witnesses.csv">극값을 만드는 공통 가중치와 기여도</a> · <a href="../../tables/recycling_indicator/weight_rank_outer.csv">보수적 순위 외곽 범위</a> · <a href="../../tables/recycling_indicator/weight_reference_vertices.csv">세 기준 가중치</a> · <a href="../../tables/recycling_indicator/weight_domain_bounds.csv">허용 상·하한</a></p>
+<div class="notice"><strong>증명한 범위와 남은 한계</strong><p>볼록혼합 집합의 선형 극값은 기준 벡터 중 하나에서 달성된다. 상·하한 집합에서는 계수가 작은 재질부터 남은 가중치를 배분하는 방법으로 최솟값을 구한다. <a href="weight_robustness.md">후속 방법 문서</a>에 증명과 수치 검증을 제시했다. 순위 범위는 쌍별 보장에서 얻은 보수적 외곽 범위이며 양 끝 순위가 실제 하나의 가중치에서 달성된다는 보장은 없다. 이 결과는 KOSIS 2024 <strong>처리비율</strong>의 비교이며 최종 물질회수·정책 인과효과의 우열은 아니다.</p></div>
+<p>추가로 확인한 <a href="#source-EUROSTAT26">Eurostat 2026-10-29 발표</a>의 42.0%는 전체 처리량 중 재활용 비중이다. 처리 통계는 수입을 포함하고 수출을 제외한다. 발생국 기준 최종 H/S와 직접 연결하지 않는다.</p>
+</section>
+
+<div id="evidence"><p class="eyebrow">04 / EVIDENCE & EXPLANATORY EXAMPLES</p><h2>실측과 설명 사례로 확인하는 비교의 조건</h2><p>그래프는 외부 CDN 없이 작동한다. 각 그림 아래에서 숫자 CSV와 발표용 PNG/SVG를 받을 수 있다. 원문 범위와 한계는 출처 ID로 연결된다. JRC의 추가 수치는 기관 모형이며 국가 H/S 실측값과 구분한다.</p></div>
+$charts
+
+<section class="section" id="causal_dag"><p class="eyebrow">FIGURE 12 · 인과 가설 · 추정된 정책효과 아님</p><h2>정책과 정의 변경은 보고값을 서로 다른 경로로 바꾼다</h2><img src="$causal_image" alt="정책에서 수거, 선별, 최종 산출, 원료 대체, 환경영향으로 이어지는 가설 경로. 지역 시장 여건은 정책과 최종 산출에 영향을 주며, 정의는 보고 재활용률에 직접 영향을 준다."><p>정책 채택과 회수 성과에 동시에 영향을 주는 지역·시장 조건이 있다. 재질 구성만 고정해 이 교란이 제거되지는 않는다. <a href="#source-VADENBO17">대체 가정</a>, <a href="#source-ZINK17">시장 반응</a>, <a href="#source-CS21">인과 식별 방법</a>을 추가로 검토해야 한다.</p><p><a href="../../figures/recycling_indicator/causal_dag.png">PNG</a> · <a href="../../figures/recycling_indicator/causal_dag.svg">SVG</a> · <a href="../../tables/recycling_indicator/causal_edges.csv">경로 CSV</a></p></section>
+
+<section id="validity" class="section">
+<p class="eyebrow">05 / VALIDITY AND CAUSAL CLAIMS</p><h2>지표의 산술적 성질은 입증할 수 있다. 정책효과는 별도 식별이 필요하다.</h2>
+<div class="grid"><div><h3>설계가 보장하는 성질</h3><p>0≤F≤G이고 양의 공통 가중치 합이 1이면 H/S는 0–100%다. 다른 조건을 고정한 채 특정 재질 F가 늘면 S는 감소하지 않는다. G와 F를 같은 배수로 늘려도 S는 같다. 재질별 회수율이 같으면 재질 구성이 달라도 S는 같다.</p><div class="formula">∂S/∂F<sub>m</sub> = 100w*<sub>m</sub>/G<sub>m</sub> &gt; 0<br>H − S = 100Σ(a<sub>m</sub> − w*<sub>m</sub>)h<sub>m</sub></div><p>모든 재질에서 A의 회수율이 B 이상이면 같은 양의 w에서 S도 A가 B 이상이다. 재질별 우열이 엇갈리면 가중치에 따른 결론 차이를 공개해야 한다.</p></div><div><h3>아직 입증되지 않은 주장</h3><p>높은 S가 정책의 인과효과를 뜻하지 않는다. 원료가격·시설·소득·제품구성 등의 차이가 남는다. 처리량과 구성비의 관계를 회귀해 유의한 p값을 얻는 것은 이 문제의 해결이나 지표 타당성 입증이 아니다.</p><p>높은 S만으로 환경 순편익이 크다고 단정할 수 없다. 재생재가 1차 원료를 얼마나 대체하는지, 추가 공정·수송의 영향은 얼마인지가 필요하다. <a href="#source-HAUPT19">순환성과 지속가능성</a>, <a href="#source-ZAMAN13">대체 잠재량</a>을 구분한다.</p></div></div>
+<p>최종 회수율과 직접표준화는 선행 개념을 계승한다. 연구의 기여는 이들을 출처 감사·일관된 경계·부분식별·재현 가능한 표와 그림으로 함께 운용하는 데 있다. 자료 요건과 산출 확정까지의 시간 지연이 커진다는 비용도 있다.</p>
+</section>
+
+<section id="next" class="section"><p class="eyebrow">06 / FALSIFIABLE VALIDATION PLAN</p><h2>측정 감사에서 국제 검증, 정책 인과검증으로 이어간다</h2>
+<ol class="steps"><li><strong>독립 물질수지 감사:</strong> 계근, 수분·오염·첨가물, 최종 규격·거래, 교역 도착시설, 코호트·재고를 확보해 G/I/F를 대조한다. 경계 문자열과 파일 해시만으로 원자료의 진실성이 입증되지는 않는다.</li><li><strong>수렴·판별 타당성:</strong> 같은 F로 지표와 검증결과를 동시에 만들지 않고, 독립 감사한 이용가능 재생물질과 비교한다. 수거·선별 지표보다 최종 성과를 잘 반영하는지 검증한다.</li><li><strong>국제 견고성:</strong> 국가·재질 분류를 감사하고 기준연도·대상국·가중치·수출 미확인 범위에 따른 결과 변화를 확인한다. 빈번한 역전이 있으면 단일 순위를 축소한다.</li><li><strong>정책효과:</strong> 공식 시행일과 대상범위, 일관된 전후 패널·비교지역을 확보한다. 시차 도입의 경우 집단×시점 DiD를 검토하고 평행추세·선행반응·동시정책·지역 간 이동을 평가한다. 현재는 이런 정책 패널이 없어 효과를 추정하지 않았다.</li><li><strong>환경·사회 결과:</strong> 독립적인 LCA와 실제 비용·시간 자료를 결합한다. 높은 S가 환경편익과 연결되지 않으면 환경 우월성 주장을 채택하지 않고 물질회수 지표로 해석한다.</li></ol>
+<p><strong>예방 성과도 함께:</strong> 재활용이 쉬운 폐기물 발생 자체를 줄이면 총 재활용률은 낮아질 수 있다. H/S와 1인당 발생량·미회수량·관측 범위·검증된 환경/비용 지표를 함께 제시한다. 비율을 높이기 위해 폐기물을 더 만들 유인을 피해야 한다.</p>
+</section>
+
+<section id="literature" class="section"><p class="eyebrow">07 / LITERATURE & OFFICIAL EVIDENCE</p><h2>$source_count개 근거의 활용과 확인 범위</h2><p>초기 검토일은 2026-11-16이며 후속 근거 3항목은 2026-11-19에 확인했다. 체계적 전수 고찰·메타분석으로 표방하지 않는다. 학술 연구, 법정 규칙, 통계자료와 방법론을 포함하며 독립 실험 $source_count건을 뜻하지 않는다. 동적 메타데이터는 열람 버전, 통계는 기준연도를 적었다. 초록 확인과 선택 절 확인, 공식 색인 확인을 구분한다.</p>$sources</section>
+<section class="section"><h2>재현</h2><div class="formula">.venv\Scripts\python scripts/run_recycling_indicator.py</div><p>저장된 실데이터로 재생성하며 네트워크나 API 키가 필요하지 않다. 그래프 수치 CSV, PNG/SVG, 대화형 그림, 입력·분석 코드 해시는 같은 출력 묶음에 저장한다. <a href="study.md">전체 연구 보고서</a>와 <a href="data_contract.md">입력 계약</a>에서 수집 항목과 해석의 세부 조건을 확인할 수 있다.</p></section>
+</main>
+<footer>RPL 연구안 v1.1 · 2026-11-19 후속 검토 · 실제 처리통계·기관 모형·문헌 사례·가상 설명을 구분했다. 새 최종 산출률의 국제 순위와 특정 정책의 인과효과는 아직 식별되지 않았다. 출처·한계·재현 코드와 함께 검토할 수 있는 연구 산출물이다.</footer>
+</body>
+</html>

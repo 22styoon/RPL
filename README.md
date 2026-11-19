@@ -1,5 +1,27 @@
 # RPL | 분리배출 정책 통계분석 및 시각화
 
+## 재활용률의 국제 비교 지표 연구
+
+**국가마다 다른 재활용률의 계산 기준을 맞춘 뒤 비교한다.** [전체 연구 보고서](docs/recycling_indicator_study.md)는 선행연구와 공식 기준 22항목을 검토하고, 같은 폐기물 범위·발생국·발생연도의 최종 재생물질 회수율 H와 공통 재질 구성의 표준화 지표 S를 제안합니다. 산식의 정당성·인과 해석·검증 설계를 함께 설명합니다. [근거 원장](data/indicator_sources.json) · [입력 계약](docs/indicator_data_contract.md)
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python scripts/run_recycling_indicator.py
+```
+
+[대화형 지표 연구 보고서](outputs/reports/recycling_indicator/index.html)를 열면 실측 통계·문헌 사례·가상 설명을 구분한 **9개 그림**, 그래프 수치 CSV, 발표용 PNG/SVG, 출처와 확인 범위를 볼 수 있습니다. 외부 CDN·API 키 없이 재현하며 앱의 **재활용 지표 연구** 메뉴에서도 확인할 수 있습니다. 실행 결과는 Git에서 제외된 `outputs/`에 생성됩니다. `run_statistical_analysis.py`도 이 연구 보고서를 함께 생성합니다.
+
+한국 0.2·0.3·0.5는 국가 연간 재활용 실적률의 보편 가중치가 아니라 EPR **재활용의무율 설정용** 과거 실적 가중치입니다. 현재 KOSIS 자료는 최종 재생원료 산출량이 아닌 처리량이므로 새 H/S의 국가 관측 순위·정책 인과효과는 미산출 상태로 명시합니다.
+
+## 2026-11-19 후속 연구: 가중치 범위 전체의 비교
+
+초기 22개 근거·9개 그림에 [추가 근거 3항목](data/indicator_followup_sources.json)과 그림 3개를 더해 현재 보고서는 **근거 25항목·그림 12개**입니다. [후속 방법·결과](docs/indicator_weight_robustness_2026-11-19.md)는 두 지역에 같은 가중치를 적용해 허용 범위 전체의 비교가 유지되는지 검증합니다. KOSIS 2024년 17개 시도 136쌍 중, 세 기준 가중치의 모든 혼합에서는 123쌍, 재질별 최소·최대 경계 전체에서는 118쌍, 비음수 가중치 전체에서는 83쌍의 비교 방향이 유지됩니다. 극값을 만드는 가중치·재질 기여도와 보수적 순위 외곽 범위를 CSV로 재현합니다.
+
+같은 실행 명령으로 보고서를 갱신하며 앱의 **재활용 지표 연구 → 가중치 범위 전체의 비교**에서 결과를 확인합니다. 가중치 집합은 민감도 시나리오이고 순위 범위는 신뢰구간이 아닙니다. [JRC 2025 모형과 Eurostat 2026 공표의 확인 범위](docs/indicator_followup_evidence_2026-11-19.md)도 추가했습니다. 이 자료를 최종 H/S 국가 실측값이나 정책 인과효과로 전환하지 않습니다.
+
+## 기존 통계 분석
+
 국내외 폐기물 실데이터를 Python으로 수집·정제·분석하고, 질문별 표·그래프·출처·한계를 재현하는 연구 프로젝트입니다. 기본 보고서는 **독립 분석 9개**를 제공합니다. 별도 지역 연구 보고서는 2024년 `R_r/S_r` 표준화와 가중치 민감도를 분석합니다. 기존 정책 계산은 별도의 **가정 기반 민감도 분석**입니다.
 
 [대화형 통계 보고서](outputs/reports/statistical_analysis/index.html) · [개편 결과·검증](docs/statistical_refactor_report_2026-11-16.md) · [분석 사용법](docs/statistical_analysis_guide.md) · [선행연구](docs/literature_review.md)

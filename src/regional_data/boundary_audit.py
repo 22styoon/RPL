@@ -211,7 +211,9 @@ def run_boundary_audit(*,root=ROOT,timeout=30,delay_seconds=.2,max_pages_per_que
     output=root/"data/processed/regional_2024"
     monthly.to_csv(output/"admin_codes_monthly_2024.csv",index=False,encoding="utf-8-sig")
     summary.to_csv(output/"boundary_audit_monthly_summary.csv",index=False,encoding="utf-8-sig")
-    pd.DataFrame(issues).to_csv(output/"boundary_audit_issues.csv",index=False,encoding="utf-8-sig")
+    issue_columns=["reference_month","sigungu_code","issue","expected_sido","actual_sido",
+                   "expected_name","actual_name","previous_sido","previous_name"]
+    pd.DataFrame(issues,columns=issue_columns).to_csv(output/"boundary_audit_issues.csv",index=False,encoding="utf-8-sig")
     pd.DataFrame(crosswalk).to_csv(output/"boundary_audit_crosswalk_202412.csv",index=False,encoding="utf-8-sig")
     manifest={"source_id":"kr_admin_codes_2024","source_url":"https://www.data.go.kr/data/15108065/openapi.do",
         "endpoint":MOIS_ENDPOINT,"reference_year":2024,"retrieved_at":datetime.now(ZoneInfo("Asia/Seoul")).isoformat(timespec="seconds"),
@@ -232,16 +234,24 @@ def run_boundary_audit(*,root=ROOT,timeout=30,delay_seconds=.2,max_pages_per_que
             "crosswalk":"data/processed/regional_2024/boundary_audit_crosswalk_202412.csv"}}
     dump(output/"boundary_audit_manifest.json",manifest)
 
+    # A completed refresh may overturn an earlier successful audit. Propagate
+    # both outcomes so downstream reports cannot retain a stale success flag.
+    data_path=output/"sigungu_2024_materials_verified.csv"
+    frame=pd.read_csv(data_path,dtype={"sigungu_code":str})
     if stable:
-        data_path=output/"sigungu_2024_materials_verified.csv"
-        frame=pd.read_csv(data_path,dtype={"sigungu_code":str})
-        frame["compatibility_status"]="2024_monthly_MOIS_code_name_roster_stable; 35_nested_general_districts_excluded; geometry_not_assessed"
-        frame.to_csv(data_path,index=False,encoding="utf-8-sig")
-        prep_manifest=output/"manifest.json"
-        if prep_manifest.exists():
-            meta=json.loads(prep_manifest.read_text(encoding="utf-8"))
-            meta["metadata_code_snapshot"]="2024_monthly_code_name_roster_stable_geometry_not_assessed"
-            meta["administrative_boundary_audit_status"]="code_name_roster_stable"
-            meta["administrative_boundary_audit_geometry_assessed"]=False
-            dump(prep_manifest,meta)
+        nested_count=manifest["summary"]["nested_general_district_count_december"]
+        frame["compatibility_status"]=(
+            f"2024_monthly_MOIS_code_name_roster_stable; {nested_count}_nested_general_districts_excluded; geometry_not_assessed")
+    else:
+        frame["compatibility_status"]="2024_monthly_MOIS_code_name_roster_review_required; geometry_not_assessed"
+    frame.to_csv(data_path,index=False,encoding="utf-8-sig")
+    prep_manifest=output/"manifest.json"
+    if prep_manifest.exists():
+        meta=json.loads(prep_manifest.read_text(encoding="utf-8"))
+        meta["metadata_code_snapshot"]=(
+            "2024_monthly_code_name_roster_stable_geometry_not_assessed" if stable
+            else "2024_monthly_code_name_roster_review_required_geometry_not_assessed")
+        meta["administrative_boundary_audit_status"]="code_name_roster_stable" if stable else "review_required"
+        meta["administrative_boundary_audit_geometry_assessed"]=False
+        dump(prep_manifest,meta)
     return manifest

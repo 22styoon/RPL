@@ -105,6 +105,8 @@ def test_standardization_supports_many_named_areas_without_inference():
 
 def test_offline_sigungu_report_uses_229_real_regions(tmp_path):
     from src.model import ROOT
+    if not (ROOT/"data/processed/regional_2024/sigungu_2024_materials_verified.csv").exists():
+        pytest.skip("시군구 원자료는 저장소 배포 대상이 아님. 지역 원표 수집·전처리 후 실자료 통합 검증 가능")
     manifest=run_sigungu_report(root=ROOT,output_root=tmp_path)
     assert manifest["status"]=="complete"
     assert manifest["summary"]["sigungu_count"]==229

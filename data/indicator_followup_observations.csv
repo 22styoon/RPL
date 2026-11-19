@@ -1,0 +1,3 @@
+indicator,rate_pct,reference_year,publication_year,scope,measurement_type,source_id,source_locator
+적정 수거율(재활용 전용 수거 아님·처분 경로 포함),86.0,2022,2025,EU-27 플라스틱 가치사슬·9개 부문·15개 고분자·생활폐기물 한정 아님,공식기관 MFA 모형 추정·국가 H/S 실측값 아님,JRC25,JRC142860 공개 초록의 적정 수거 36.6Mt 및 발생량 대비 비율; 처분 경로는 JRC 2025-08-11 공식 보도자료 해당 절 보충 확인
+폐기 후 재활용률(EOL recycling rate),19.6,2022,2025,EU-27 플라스틱 가치사슬·9개 부문·15개 고분자·생활폐기물 한정 아님,공식기관 MFA 모형 추정·국가 H/S 실측값 아님,JRC25,JRC142860 공개 초록의 EU-27 평균 end-of-life recycling rate
