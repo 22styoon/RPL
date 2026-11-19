@@ -178,7 +178,9 @@ def test_review_required_refresh_revokes_previous_roster_success(tmp_path, monke
     assert refreshed["summary"]["monthly_name_mismatches"] == 1
     metadata = json.loads(preparation.read_text(encoding="utf-8"))
     assert metadata["administrative_boundary_audit_status"] == "review_required"
-    assert metadata["metadata_code_snapshot"] == "2024_monthly_code_name_roster_review_required_geometry_not_assessed"
+    assert metadata["metadata_code_snapshot"] == "current_bound_monthly_audit_not_verified"
+    assert metadata["boundary_input_binding_verified"] is False
+    assert metadata["policy_join_boundary_input_verified"] is False
     assert metadata["administrative_boundary_audit_geometry_assessed"] is False
     updated = pd.read_csv(waste_path)
     assert updated.compatibility_status.str.contains("review_required").all()

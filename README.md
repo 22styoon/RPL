@@ -30,6 +30,8 @@ python -m venv .venv
 
 ## 실행
 
+월별 경계 감사는 이제 현재 시군구 코드·명칭, 12월 코드 목록, 월별 자료와 원문 페이지의 지문이 맞아야 유효합니다. 네트워크 없이 상태만 확인하려면 `python scripts/audit_regional_boundaries.py --check-only`를 사용합니다. 입력이 달라지거나 기존 감사에 지문이 없으면 과거 완료·정책 결합을 현재 검증으로 인정하지 않습니다. [감사 증빙 계약과 재현 순서](docs/boundary_evidence_contract_2026-11-20.md)를 참고하세요.
+
 기존 가상환경에서는 한 명령으로 저장한 실데이터의 표·PNG/SVG·대화형 그래프·보고서를 다시 만듭니다. 기본 재생성은 네트워크나 API 키를 사용하지 않습니다.
 
 ```powershell

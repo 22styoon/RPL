@@ -7,6 +7,8 @@ import streamlit as st
 import yaml
 from src.model import ROOT
 from src.analysis.pipeline import TITLE
+from src.regional_data.audit_evidence import assess_boundary_audit
+from src.regional_data.audit_reporting import current_audit_fields
 
 MENU=["국내 통계 현황","재활용 지표 연구","지역·재질별 비교","시도 표준화 분석","해외 통계 비교","시설 및 비용 분석","가구 시간 분석","선행연구","자료 출처·품질","가정 기반 민감도 분석"]
 REPORT=ROOT/"outputs/reports/statistical_analysis"
@@ -116,6 +118,33 @@ def render_quality(manifest):
         st.rerun()
     st.caption("기본 재생성은 네트워크·인증키를 사용하지 않는다. 원자료 수집은 별도 CLI에서 명시적으로 실행한다.")
 
+def live_regional_audit_view(cached_summary, *, assessment=None):
+    """Current geography evidence overrides historical report audit claims.
+
+    Policy-document evidence stays separate from the current outcome join.
+    This helper never modifies or silently regenerates the saved report.
+    """
+    current=assess_boundary_audit(ROOT) if assessment is None else assessment
+    summary=dict(cached_summary)
+    summary.update(current_audit_fields(ROOT,cached_summary,assessment=current))
+    summary["cached_boundary_audit_status"]=cached_summary.get("administrative_boundary_audit_status","not_audited")
+    summary["cached_report_stale"]=(summary["cached_boundary_audit_status"]=="code_name_roster_stable"
+        and not summary["policy_join_boundary_input_verified"])
+    return summary
+
+
+def regional_boundary_caption(summary, *, county_report=False):
+    if summary.get("boundary_input_binding_verified") is True:
+        note="2024년 월별 코드·명칭 감사의 현재 입력과 증빙이 일치합니다."
+    else:
+        note="월별 코드·명칭 감사의 현재 입력 유효성을 확인하지 못했습니다. 저장된 완료 표시는 현재 검증으로 사용하지 않습니다."
+    if county_report:
+        prefix=f'공식 원표 기준 {summary.get("sigungu_count",0)}개 시군구의 R/S 기술 비교입니다. '
+    else:
+        prefix=f'시군구 자료 {summary.get("sigungu_verified_rows",0)}행을 기준으로 확인했습니다. '
+    return prefix+note+" GIS 경계 도형과 정책 적용권역은 별도 검증 대상이며 지도·정책효과 추론의 근거로 사용하지 않습니다."
+
+
 def render_regional_indicator():
     directory=OUTPUT/"reports/regional_indicator"
     path=directory/"manifest.json"
@@ -126,14 +155,27 @@ def render_regional_indicator():
             from src.analysis.regional_indicator_report import run
             run();st.rerun()
         return
-    meta=json.loads(path.read_text(encoding="utf-8"));summary=meta["summary"]
+    meta=json.loads(path.read_text(encoding="utf-8"))
+    current_audit=assess_boundary_audit(ROOT)
+    summary=live_regional_audit_view(meta["summary"],assessment=current_audit)
     st.subheader("2024년 시도별 재질 구성 표준화")
     st.markdown("지역별 4재질 발생량 비중을 전국 실측 발생량 비중으로 고정해 비교합니다. 정책효과나 최종 재생원료 생산률을 나타내지 않습니다.")
     columns=st.columns(4)
     columns[0].metric("시도 관측",f'{summary["sido_rows"]}개')
     columns[1].metric("시군구 자료 연결",f'{summary["sigungu_verified_rows"]}행')
     columns[2].metric("검증된 정책",f'{summary["policy_verified_rows"]}건')
-    columns[3].metric("정책·실적 검증 결합",f'{summary["verified_join_rows"]}행')
+    columns[3].metric("정책·실적 검증 결합",f'{summary["verified_join_rows"]}행' if summary["policy_join_boundary_input_verified"] else "재검증 전")
+    if summary["cached_report_stale"]:
+        st.warning("저장된 보고서의 감사·정책 결합 근거를 현재 입력과 연결해 확인하지 못했습니다. 아래 그림과 다운로드는 과거 생성 결과입니다.")
+    if not summary["policy_join_boundary_input_verified"]:
+        prefix="지리 감사는 현재 유효하지만 저장된 정책·성과 결합의 입력 연결을 다시 확인해야 합니다. " if summary["boundary_input_binding_verified"] else "현재 정책·성과 결합은 지리 근거 재검증 전 상태입니다. "
+        st.info(prefix+f'저장 보고서의 {summary["cached_verified_join_rows"]}행을 현재 검증된 결합으로 표시하지 않습니다. 정책 원문 자체의 검증 건수는 별도로 유지합니다.')
+    if summary["boundary_audit_reasons"]:
+        st.caption("감사 확인 상태: "+summary["administrative_boundary_audit_status"]+" · "+"; ".join(str(reason) for reason in summary["boundary_audit_reasons"]))
+    with st.expander("현재 입력 감사 확인·재생성"):
+        st.code(r".\.venv\Scripts\python scripts/audit_regional_boundaries.py --check-only",language="powershell")
+        st.caption("이 확인 명령은 저장된 입력과 증빙만 검사합니다. 입력이 바뀌었으면 월별 감사를 다시 실행한 뒤 정책 결합과 보고서를 재생성하세요.")
+        st.code(".\\.venv\\Scripts\\python scripts/audit_regional_boundaries.py\n.\\.venv\\Scripts\\python scripts/join_regional_policy.py --year 2024\n.\\.venv\\Scripts\\python run_statistical_analysis.py",language="powershell")
     for key,title,table_name in (("scores","관측 R과 표준화 S","scores"),("contributions","재질별 R-S 기여도","contributions"),("weight_sensitivity","가중치 민감도","weight_sensitivity")):
         figure=artifact_path(f"figures/regional_indicator/{key}.json")
         st.plotly_chart(pio.read_json(figure),width="stretch",key="regional_indicator_"+key)
@@ -154,10 +196,7 @@ def render_regional_indicator():
                 st.dataframe(pd.read_csv(csv_path),hide_index=True)
                 st.download_button(name+" CSV",csv_path.read_bytes(),csv_path.name,"text/csv",key="regional_download_"+name)
         st.warning("R은 재질 구성과 재질별 처리비율의 산술 결합입니다. 회귀 p값은 지표 타당성이나 정책효과를 증명하지 않습니다.")
-    if summary.get("administrative_boundary_audit_status") == "code_name_roster_stable":
-        st.info(f'시군구 {summary["sigungu_verified_rows"]}행의 2024년 월별 코드·명칭 대조가 완료됐습니다. GIS 경계 도형은 평가하지 않았고, 실제 정책 자료가 없어 정책 결합은 {summary["verified_join_rows"]}행입니다.')
-    else:
-        st.info(f'시군구는 이름·2024년 말 코드가 연결된 {summary["sigungu_verified_rows"]}행입니다. 월별 코드·명칭 감사가 끝나지 않았고 실제 정책 자료가 없어 정책 결합은 {summary["verified_join_rows"]}행입니다.')
+    st.info(regional_boundary_caption(summary))
     ordinance_versions=summary.get("law_ordinance_version_candidates",0)
     if ordinance_versions:
         st.caption(
@@ -178,9 +217,12 @@ def render_regional_indicator():
     sigungu_report=OUTPUT/"reports/regional_indicator_sigungu"
     sigungu_manifest=sigungu_report/"manifest.json"
     if sigungu_manifest.exists():
-        county=json.loads(sigungu_manifest.read_text(encoding="utf-8"));county_summary=county["summary"]
+        county=json.loads(sigungu_manifest.read_text(encoding="utf-8"))
+        county_summary=live_regional_audit_view(county["summary"],assessment=current_audit)
         st.divider();st.subheader("시군구 보조 기술 비교")
-        st.caption("2024년 공식 원표 지역명 기준 229개 지역의 R/S 분포입니다. 월별 코드·명칭 대조는 완료됐으나 GIS 경계 도형과 정책 적용권역은 미확인 상태이므로 지도·정책 효과 회귀를 제공하지 않습니다.")
+        st.caption(regional_boundary_caption(county_summary,county_report=True))
+        if county_summary["cached_report_stale"]:
+            st.warning("시군구 보고서도 과거 감사 상태를 포함한 저장 결과입니다. 현재 입력 감사와 보고서 재생성이 필요합니다.")
         st.metric("시군구 관측",f'{county_summary["sigungu_count"]}개 · {county_summary["material_rows"]} 재질행')
         for key,title,table_name in (("county_scatter","시군구 R과 S","scores"),("county_distribution","분포 비교","scores"),("county_extremes","표준화 상·하위","scores")):
             figure=artifact_path(f"figures/regional_indicator_sigungu/{key}.json")
@@ -190,10 +232,10 @@ def render_regional_indicator():
             st.dataframe(pd.read_csv(county_scores),hide_index=True)
             st.download_button("시군구 지표 CSV",county_scores.read_bytes(),county_scores.name,"text/csv",key="regional_sigungu_scores")
         county_html=sigungu_report/"index.html"
-        if county_html.exists():st.download_button("시군구 오프라인 보고서 HTML",county_html.read_bytes(),county_html.name,"text/html",key="regional_sigungu_html")
+        if county_html.exists():st.download_button("시군구 오프라인 보고서 HTML"+(" (과거 저장 결과)" if county_summary["cached_report_stale"] else ""),county_html.read_bytes(),county_html.name,"text/html",key="regional_sigungu_html")
     for name in ("index.html","report.md"):
         file=directory/name
-        if file.exists():st.download_button("지역 분석 보고서 "+name,file.read_bytes(),name,"text/html" if name.endswith("html") else "text/markdown",key="regional_report_"+name)
+        if file.exists():st.download_button("지역 분석 보고서 "+name+(" (과거 저장 결과)" if summary["cached_report_stale"] else ""),file.read_bytes(),name,"text/html" if name.endswith("html") else "text/markdown",key="regional_report_"+name)
 
 def render_recycling_indicator():
     st.subheader("재활용률의 국제 비교: 지표 설계와 근거")

@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 from src.model import ROOT
 from .standardization import compute_standardization
+from src.regional_data.audit_reporting import current_audit_fields,audit_note
 
 TITLE="2024년 시군구별 재활용 처리비율: 기술 비교"
 
@@ -108,8 +109,16 @@ def run(root=ROOT,output_root=None):
     law_summary=json.loads(law_summary_path.read_text(encoding="utf-8")) if law_summary_path.exists() else {}
     source_files=[processed,national_path,region_meta,root/"data/processed/regional_2024/boundary_audit_manifest.json",law_summary_path,root/"data/processed/regional_2024/policy_ordinance_candidates.csv",root/"data/processed/regional_2024/policy_ordinance_geography_crosswalk.csv",root/"data/raw/regional_2024/law_ordinances/latest.json",root/"configs/regional_indicator.yaml",root/"src/analysis/standardization.py",root/"src/analysis/sigungu_indicator_report.py",root/"src/regional_data/policy_geography.py",root/"scripts/link_law_ordinances.py",root/"src/regional_data/law_client.py",root/"scripts/collect_law_ordinances.py"]
     source_hashes={str(path.relative_to(root)).replace("\\","/"):{"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"bytes":path.stat().st_size} for path in source_files if path.exists()}
+    for relative in ("src/regional_data/audit_evidence.py","src/regional_data/audit_reporting.py",
+                     "data/processed/regional_2024/admin_codes_monthly_2024.csv",
+                     "data/processed/regional_2024/admin_codes_202412.csv",
+                     "data/raw/regional_2024/kr_admin_codes_2024/checkpoint.json"):
+        path=root/relative
+        if path.exists():source_hashes[relative]={"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"bytes":path.stat().st_size}
     maxrow=scores.loc[scores["구성 차이 R-S(%p)"].abs().idxmax()]
     summary={"reference_year":2024,"sigungu_count":len(scores),"material_rows":len(counties),"policy_verified_rows":metadata.get("policy_verified_rows",0),"verified_join_rows":metadata.get("verified_join_rows",0),"law_ordinance_version_candidates":law_summary.get("ordinance_version_rows",0),"law_ordinance_unique_ids":law_summary.get("unique_ordinance_ids",0),"law_ordinance_matched_statistical_unit_rows":law_summary.get("matched_waste_statistical_unit_rows",0),"law_ordinance_sido_only_rows":law_summary.get("sido_only_rows",0),"law_ordinance_unmatched_rows":law_summary.get("unmatched_locality_rows",0),"law_ordinance_detail_json_count":law_summary.get("ordinance_detail_json_count",0),"law_api_status":law_summary.get("law_api_status","not_collected"),"code_snapshot":metadata.get("metadata_code_snapshot","unknown"),"administrative_boundary_audit_status":metadata.get("administrative_boundary_audit_status","not_audited"),"administrative_boundary_audit_geometry_assessed":metadata.get("administrative_boundary_audit_geometry_assessed",False),"max_abs_shift_area":maxrow["시군구"],"max_abs_shift_pp":float(maxrow["구성 차이 R-S(%p)"].__abs__()),"source_files":source_hashes}
+    summary.update(current_audit_fields(root,metadata,waste_frame=counties))
+    summary["code_snapshot"]=summary["metadata_code_snapshot"]
     summary.update({
         "observed_r_min_pct":float(scores["관측 처리비율 R_r(%)"].min()),
         "observed_r_median_pct":float(scores["관측 처리비율 R_r(%)"].median()),
@@ -128,10 +137,7 @@ def run(root=ROOT,output_root=None):
     for name,fig in figs.items():
         fragment=pio.to_html(fig,full_html=False,include_plotlyjs=True if not sections else False)
         sections.append(f'<section><h2>{html.escape(fig.layout.title.text)}</h2>{fragment}<p><a href="../../tables/regional_indicator_sigungu/scores.csv">전체 시군구 지표 CSV</a> · <a href="../../tables/regional_indicator_sigungu/weight_sensitivity.csv">가중치 민감도 CSV</a></p></section>')
-    if summary["administrative_boundary_audit_status"] == "code_name_roster_stable":
-        boundary_note="2024년 12개월 코드·명칭 로스터 대조는 완료됐고, GIS 경계 도형과 지역 간 반입·반출은 평가하지 않았습니다."
-    else:
-        boundary_note="월별 행정코드·명칭 로스터 대조가 아직 완료되지 않았습니다."
+    boundary_note=audit_note(summary)
     note=(f"공식 2024 원표의 지역명으로 {len(scores)}개 시군구·4재질 관측값을 비교했습니다. 처리행 {len(counties)}개. {boundary_note} 법제처 조례 연혁 후보 {summary['law_ordinance_version_candidates']}버전 중 {summary['law_ordinance_matched_statistical_unit_rows']}행이 통계단위 코드와 일치했고, 본문 {summary['law_ordinance_detail_json_count']}건을 받았습니다. 실제 정책-성과 검증 결합은 {summary['verified_join_rows']}행입니다.")
     md=[f"# {TITLE}",f"\n생성: {generated}\n","## 해석범위\n",note,"\n같은 전국 기준 재질 가중치로 각 시군구의 4재질별 실측 처리비율을 다시 계산한 **기술 비교**입니다. 지도화·정책노출 연결·시군구 회귀는 하지 않습니다.\n","## 요약\n",f"지역 수 {len(scores)} · 재질별 처리행 {len(counties)} · 최대 |R-S|: {maxrow['시군구']} {summary['max_abs_shift_pp']:.2f}%p.\n","## 시군구 전체 결과\n",_md_table(scores),"\n## 가중치 민감도 요약\n",_md_table(sens_summary),"\n## 제한\n","- 전국 기준비중은 KOSIS 2024 전국 4재질 발생량입니다. 분자는 물질재활용 처리량이며 최종 재생원료 수율이 아닙니다.\n- 행정코드·명칭 목록 감사는 GIS 경계 도형 또는 지역 간 반입·반출을 확인하지 않습니다. 행정명은 원표 기준입니다.\n- 시군구별 결과는 기술 통계입니다. 정책 자료가 없어 인과추론·정책 랭킹·회귀를 하지 않습니다.\n- 모든 지역에 같은 전국 가중치를 적용했습니다. 가중치 민감도 CSV에서 지역 평균·균등·해당 시군구 제외 전국 비중을 비교할 수 있습니다.\n","## 재현\n",f"`{manifest['reproduction_command']}`\n"]
     md.extend(["\n## 시군구 분포 요약\n",_md_table(descriptive_summary)])

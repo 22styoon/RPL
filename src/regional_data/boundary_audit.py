@@ -13,6 +13,7 @@ import pandas as pd
 
 from src.model import ROOT
 from .clients import MOIS_ENDPOINT, dump, load_mois_key
+from .audit_evidence import make_input_binding,assess_boundary_audit
 
 ROOT_CODES=("11","26","27","28","29","30","31","36","41","43","44","46","47","48","50","51","52")
 ALIASES={
@@ -228,6 +229,7 @@ def run_boundary_audit(*,root=ROOT,timeout=30,delay_seconds=.2,max_pages_per_que
             "code_name_changes":int(summary.code_names_changed_vs_previous_month.sum()),
             "statistical_code_name_roster_stable":bool(stable)},
         "requests":request_log,"run_id":run_id,"raw_directory":raw_dir.relative_to(root).as_posix(),
+        "input_binding":make_input_binding(waste_units,monthly,request_log),
         "artifacts":{"monthly":"data/processed/regional_2024/admin_codes_monthly_2024.csv",
             "monthly_summary":"data/processed/regional_2024/boundary_audit_monthly_summary.csv",
             "issues":"data/processed/regional_2024/boundary_audit_issues.csv",
@@ -238,20 +240,33 @@ def run_boundary_audit(*,root=ROOT,timeout=30,delay_seconds=.2,max_pages_per_que
     # both outcomes so downstream reports cannot retain a stale success flag.
     data_path=output/"sigungu_2024_materials_verified.csv"
     frame=pd.read_csv(data_path,dtype={"sigungu_code":str})
-    if stable:
+    assessment=assess_boundary_audit(root,waste_frame=frame)
+    bound=assessment["verified"]
+    frame["boundary_input_binding_verified"]=bool(bound)
+    frame["boundary_waste_roster_sha256"]=assessment.get("waste_roster_sha256","")
+    frame["boundary_monthly_roster_sha256"]=assessment.get("monthly_roster_sha256","")
+    if bound:
         nested_count=manifest["summary"]["nested_general_district_count_december"]
         frame["compatibility_status"]=(
-            f"2024_monthly_MOIS_code_name_roster_stable; {nested_count}_nested_general_districts_excluded; geometry_not_assessed")
+            f"2024_monthly_MOIS_code_name_roster_stable; input_binding_verified; {nested_count}_nested_general_districts_excluded; geometry_not_assessed")
     else:
-        frame["compatibility_status"]="2024_monthly_MOIS_code_name_roster_review_required; geometry_not_assessed"
+        frame["compatibility_status"]="2024_monthly_MOIS_code_name_roster_review_required; input_binding_unverified; geometry_not_assessed"
     frame.to_csv(data_path,index=False,encoding="utf-8-sig")
     prep_manifest=output/"manifest.json"
     if prep_manifest.exists():
         meta=json.loads(prep_manifest.read_text(encoding="utf-8"))
         meta["metadata_code_snapshot"]=(
-            "2024_monthly_code_name_roster_stable_geometry_not_assessed" if stable
-            else "2024_monthly_code_name_roster_review_required_geometry_not_assessed")
-        meta["administrative_boundary_audit_status"]="code_name_roster_stable" if stable else "review_required"
+            "2024_monthly_code_name_roster_stable_input_binding_verified_geometry_not_assessed" if bound
+            else "current_bound_monthly_audit_not_verified")
+        meta["administrative_boundary_audit_status"]=assessment["status"]
+        meta["boundary_input_binding_verified"]=bool(bound)
+        meta["boundary_waste_roster_sha256"]=assessment.get("waste_roster_sha256","")
+        meta["boundary_monthly_roster_sha256"]=assessment.get("monthly_roster_sha256","")
+        meta["boundary_audit_reasons"]=assessment.get("reasons",[])
+        meta["boundary_audit_input_binding_version"]=assessment.get("input_binding_version")
+        # The audit verifies geography. Policy/outcome joins need their own
+        # preparation pass after the current evidence has been established.
+        meta["policy_join_boundary_input_verified"]=False
         meta["administrative_boundary_audit_geometry_assessed"]=False
         dump(prep_manifest,meta)
     return manifest

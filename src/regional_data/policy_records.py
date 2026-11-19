@@ -1,7 +1,13 @@
+import re
 import pandas as pd
 POLICY_FIELDS=["policy_id","policy_name","policy_category","reference_year","sigungu_code","implemented_in_2024","start_date","end_date","target_materials","collection_mode","operating_entity","coverage_level","coverage_description","waste_scope","measurement_stage","scope_verified","code_reference_month","administrative_boundary_verified","boundary_source_url","boundary_source_locator","source_url","source_locator","retrieved_at","evidence_status"]
 JOIN_FIELDS=["policy_id","policy_name","policy_category","sigungu_code","reference_year","material","generated_t","material_recycling_t","source_url","policy_source_url","verification_status"]
 EXCLUSION_FIELDS=["policy_id","sigungu_code","material","reason"]
+BOUNDARY_AUDIT_TOKENS={
+    "2024_monthly_MOIS_code_name_roster_stable",
+    "input_binding_verified",
+    "geometry_not_assessed",
+}
 def flag(value):
     return value is True or str(value).strip().lower()=="true"
 
@@ -13,7 +19,23 @@ def missing(value):
         pass
     return str(value).strip()==""
 
+def _bound_roster_audit_status(value):
+    """Recognize the code/name audit contract without claiming GIS verification."""
+    if not isinstance(value,str):return False
+    tokens=[token.strip() for token in value.split(";") if token.strip()]
+    if len(tokens)!=len(set(tokens)) or not BOUNDARY_AUDIT_TOKENS.issubset(tokens):return False
+    # Unknown or contradictory states cannot become positive by substring.
+    return all(token in BOUNDARY_AUDIT_TOKENS
+               or re.fullmatch(r"\d+_nested_general_districts_excluded",token)
+               for token in tokens)
+
+
 def verified_join(materials,policies):
+    """Join verified policies only to input-bound code/name-audited outcomes.
+
+    administrative_boundary_verified and its source fields concern policy
+    code/name roster evidence. They do not assert that GIS geometry was audited.
+    """
     joined=[];exclusions=[]
     for policy in policies.to_dict("records"):
         reasons=[]
@@ -38,10 +60,14 @@ def verified_join(materials,policies):
         if reasons:
             exclusions.append(dict(policy_id=policy.get("policy_id"),sigungu_code=policy.get("sigungu_code"),material=None,reason=";".join(reasons)));continue
         selected=materials.loc[(materials.sigungu_code.astype(str)==str(policy["sigungu_code"]))&(materials.reference_year==2024)]
+        if selected.empty:
+            exclusions.append(dict(policy_id=policy["policy_id"],sigungu_code=policy["sigungu_code"],material=None,reason="no_matching_verified_material"));continue
         if "code_reference_month" not in selected or selected.code_reference_month.isna().any() or not selected.code_reference_month.astype(str).eq(str(policy.get("code_reference_month"))).all():
             reasons.append("data_code_reference_mismatch")
-        if "compatibility_status" not in selected or selected.compatibility_status.astype(str).str.contains("midyear_boundary_not_audited",regex=False).any():
+        if "compatibility_status" not in selected or not selected.compatibility_status.map(_bound_roster_audit_status).all():
             reasons.append("data_boundary_audit_missing")
+        if "boundary_input_binding_verified" not in selected or not selected.boundary_input_binding_verified.map(flag).all():
+            reasons.append("data_boundary_input_binding_unverified")
         if reasons:
             exclusions.append(dict(policy_id=policy["policy_id"],sigungu_code=policy["sigungu_code"],material=None,reason=";".join(dict.fromkeys(reasons))));continue
         targets=[] if missing(policy.get("target_materials")) else str(policy.get("target_materials")).split(";")

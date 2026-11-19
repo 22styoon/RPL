@@ -12,6 +12,7 @@ import yaml
 from src.model import ROOT
 from .standardization import compute_standardization
 from .regional_inference import run_composition_diagnostics
+from src.regional_data.audit_reporting import current_audit_fields,audit_note
 
 TITLE = "2024년 시도별 재활용 처리비율: 재질 구성 표준화"
 
@@ -135,12 +136,15 @@ def run(root=ROOT, output_root=None):
         "src/regional_data/clients.py","src/regional_data/geocodes.py","src/regional_data/parsers.py",
         "src/regional_data/policy_records.py","src/regional_data/prepare.py","src/regional_data/validation.py",
         "src/regional_data/boundary_audit.py","src/regional_data/law_client.py","src/regional_data/policy_geography.py",
+        "src/regional_data/audit_evidence.py","src/regional_data/audit_reporting.py",
         "scripts/collect_regional_recycling.py","scripts/prepare_regional_recycling.py",
         "scripts/audit_regional_boundaries.py","scripts/collect_law_ordinances.py","scripts/link_law_ordinances.py",
         "scripts/join_regional_policy.py","scripts/run_regional_indicator.py")]
     input_files=[source,regional,raw_meta_path,root/"data/processed/regional_2024/sido_2024_materials_verified.csv",
                  root/"data/processed/regional_2024/sigungu_2024_materials_verified.csv",
                  root/"data/processed/regional_2024/admin_codes_202412.csv",
+                 root/"data/processed/regional_2024/admin_codes_monthly_2024.csv",
+                 root/"data/raw/regional_2024/kr_admin_codes_2024/checkpoint.json",
                  root/"data/processed/regional_2024/boundary_audit_manifest.json",
                  root/"data/processed/regional_2024/policy_ordinance_candidate_summary.json",
                  root/"data/processed/regional_2024/policy_ordinance_candidates.csv",
@@ -168,6 +172,7 @@ def run(root=ROOT, output_root=None):
              "administrative_boundary_audit_status":regional_data.get("administrative_boundary_audit_status","not_audited"),
              "administrative_boundary_audit_geometry_assessed":regional_data.get("administrative_boundary_audit_geometry_assessed",False),
              "source_files":data_manifest}
+    summary.update(current_audit_fields(root,regional_data))
     manifest={"title":TITLE,"generated_at":generated,"status":"complete","summary":summary,
               "reproduction_command":r".\.venv\Scripts\python scripts/run_regional_indicator.py --year 2024 --level sido",
               "tables":{key:f"tables/regional_indicator/{key}.csv" for key in files},
@@ -185,10 +190,7 @@ def run(root=ROOT, output_root=None):
     if inference["status"]=="computed":
         inference_html=("<h3>OLS 공동검정 및 강건성 참고</h3><p>귀무가설: 폐지·폐합성수지·폐금속 발생 구성비 계수가 모두 0. R은 같은 구성비와 재질별 비율의 산술 결합이므로 이 검정은 기계적 연관을 포함하며 지표 타당성이나 정책효과 증거가 아니다.</p>"+
                         inference["tests"].to_html(index=False,float_format=lambda x:f"{x:.4g}")+"<h3>계수와 불확실성 추정</h3>"+inference["coefficients"].to_html(index=False,float_format=lambda x:f"{x:.4g}")+"<p>이분산 진단: Breusch–Pagan LM p="+f"{inference['bp_lm_p']:.4g}"+"; HC0/HC3는 이분산 검정이 아니라 강건 공분산 추정이다. 표본은 17개 시도 전수 집계이며 일반 표본추출 가정의 p값 해석에는 한계가 있다.</p>")
-    if summary["administrative_boundary_audit_status"] == "code_name_roster_stable":
-        boundary_note="2024년 월별 행정코드·명칭 로스터 대조는 완료됐으며 GIS 경계 도형은 평가하지 않았다."
-    else:
-        boundary_note="2024년 월별 행정코드·명칭 로스터 대조는 아직 완료되지 않았다."
+    boundary_note=audit_note(summary)
     note=(f"시군구 원문 파싱 후보 {summary['sigungu_candidates']}행, 이름·2024년 말 행정코드 연결 자료 {summary['sigungu_verified_rows']}행 / {summary['sigungu_verified_regions']}개 시군구. "
           f"법제처 자치법규 연혁 후보 {summary['law_ordinance_version_candidates']}버전(고유 ID {summary['law_ordinance_unique_ids']}개), 2024 통계단위 코드 일치 {summary['law_ordinance_matched_statistical_unit_rows']}행, 본문 수집 {summary['law_ordinance_detail_json_count']}건. "
           f"실제 운영정책 근거검증 {summary['policy_verified_rows']}건, 정책-성과 검증결합 {summary['verified_join_rows']}행. {boundary_note} 조례 후보만으로 운영정책 결합을 하지 않는다.")

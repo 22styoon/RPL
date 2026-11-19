@@ -32,3 +32,13 @@ def attach_codes(observations,codes):
         raise ValueError("서로 다른 행정코드가 동일한 지역명에 대응합니다.")
     fields=["sido_name","sigungu_name","reference_year","sido_code","sigungu_code","code_reference_month"]
     return observations.merge(valid[fields],on=["sido_name","sigungu_name","reference_year"],how="left",validate="many_to_one")
+
+
+def normalize_mois_roster(state):
+    """Normalize only code/name identities; population is outside this audit."""
+    records=state.get("records",[])
+    if not isinstance(records,list) or any(not isinstance(row,dict) for row in records):
+        raise ValueError("MOIS 로스터 원자료 형식 오류")
+    fields=("admmCd","statsYm","ctpvNm","sggNm")
+    geography=dict(state,records=[{field:row.get(field) for field in fields} for row in records])
+    return normalize_mois(geography)
