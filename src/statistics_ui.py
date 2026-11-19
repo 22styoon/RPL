@@ -7,6 +7,9 @@ import streamlit as st
 import yaml
 from src.model import ROOT
 from src.analysis.pipeline import TITLE
+from src.regional_data.audit_evidence import assess_boundary_audit
+from src.regional_data.audit_reporting import current_audit_fields
+from src.regional_data.ordinance_evidence import current_ordinance_fields
 
 MENU=["국내 통계 현황","재활용 지표 연구","지역·재질별 비교","시도 표준화 분석","해외 통계 비교","시설 및 비용 분석","가구 시간 분석","선행연구","자료 출처·품질","가정 기반 민감도 분석"]
 REPORT=ROOT/"outputs/reports/statistical_analysis"
@@ -116,6 +119,109 @@ def render_quality(manifest):
         st.rerun()
     st.caption("기본 재생성은 네트워크·인증키를 사용하지 않는다. 원자료 수집은 별도 CLI에서 명시적으로 실행한다.")
 
+def live_regional_audit_view(cached_summary, *, assessment=None):
+    """Current geography evidence overrides historical report audit claims.
+
+    Policy-document evidence stays separate from the current outcome join.
+    This helper never modifies or silently regenerates the saved report.
+    """
+    current=assess_boundary_audit(ROOT) if assessment is None else assessment
+    summary=dict(cached_summary)
+    summary.update(current_audit_fields(ROOT,cached_summary,assessment=current))
+    summary["cached_boundary_audit_status"]=cached_summary.get("administrative_boundary_audit_status","not_audited")
+    summary["cached_report_stale"]=(summary["cached_boundary_audit_status"]=="code_name_roster_stable"
+        and not summary["policy_join_boundary_input_verified"])
+    return summary
+
+
+def regional_boundary_caption(summary, *, county_report=False):
+    if summary.get("boundary_input_binding_verified") is True:
+        note="2024년 월별 코드·명칭 감사의 현재 입력과 증빙이 일치합니다."
+    else:
+        note="월별 코드·명칭 감사의 현재 입력 유효성을 확인하지 못했습니다. 저장된 완료 표시는 현재 검증으로 사용하지 않습니다."
+    if county_report:
+        prefix=f'공식 원표 기준 {summary.get("sigungu_count",0)}개 시군구의 R/S 기술 비교입니다. '
+    else:
+        prefix=f'시군구 자료 {summary.get("sigungu_verified_rows",0)}행을 기준으로 확인했습니다. '
+    return prefix+note+" GIS 경계 도형과 정책 적용권역은 별도 검증 대상이며 지도·정책효과 추론의 근거로 사용하지 않습니다."
+
+
+def live_ordinance_view(cached_summary):
+    """Fresh legal-source linkage controls current counts and downloads."""
+    summary=dict(cached_summary)
+    summary.update(current_ordinance_fields(ROOT,cached_summary=cached_summary))
+    law_counts=("law_ordinance_version_candidates","law_ordinance_detail_json_count",
+                "law_article_evidence_rows","law_verified_document_version_rows")
+    summary["cached_law_report_stale"]=(
+        any(cached_summary.get(key,0)!=summary.get(key,0) for key in law_counts)
+        or (bool(cached_summary.get("law_ordinance_version_candidates",0))
+            and not summary.get("law_linkage_verified",False)))
+    summary["cached_report_stale"]=bool(summary.get("cached_report_stale")) or summary["cached_law_report_stale"]
+    return summary
+
+
+def filter_ordinance_articles(frame, query):
+    """Literal search of legal titles, localities and cited article text."""
+    query=str(query or "").strip().casefold()
+    if not query or frame.empty:return frame.copy()
+    fields=[name for name in ("policy_name","locality","article_number","article_title",
+                              "article_text","materials_mentioned","topics_mentioned") if name in frame]
+    if not fields:return frame.iloc[0:0].copy()
+    text=frame[fields].fillna("").astype(str).agg(" ".join,axis=1).str.casefold()
+    return frame.loc[text.str.contains(query,regex=False)].copy()
+
+
+def render_ordinance_evidence(summary):
+    st.subheader("법령정보와 조문 근거")
+    st.caption("2024년 시행일을 가진 연혁 버전의 제목 검색 결과입니다(nw=2, efYd=2024년). 2024년에 유효했던 모든 조례나 연중 적용기간을 확인한 목록은 아닙니다.")
+    if not summary.get("law_linkage_verified",False):
+        if summary.get("cached_law_report_stale"):
+            st.warning("저장된 법령 연결의 입력·원문 근거를 현재 자료와 대조해 확인하지 못했습니다. 과거 건수를 현재 검증 결과로 표시하지 않으며 교차표·조문 다운로드를 보류합니다.")
+        else:
+            st.info("현재 입력과 원문에 연결된 법령 검토표가 아직 없습니다.")
+        if summary.get("law_linkage_reasons"):
+            st.caption("법령 연결 확인: "+"; ".join(str(reason) for reason in summary["law_linkage_reasons"]))
+        st.code(r".\.venv\Scripts\python scripts/link_law_ordinances.py",language="powershell")
+        return
+    st.caption(
+        f'연혁 후보 {summary.get("law_ordinance_version_candidates",0)}버전 · '
+        f'통계단위 코드 일치 {summary.get("law_ordinance_matched_statistical_unit_rows",0)}행 · '
+        f'본문 수집 {summary.get("law_ordinance_detail_json_count",0)}건 · '
+        f'버전 메타데이터 대조 {summary.get("law_verified_document_version_rows",0)}건 · '
+        f'조문 근거 {summary.get("law_article_evidence_rows",0)}행입니다.'
+    )
+    st.caption("조문에 재질·수거방식이 언급된 사실은 검토 단서입니다. 실제 사업 시행·대상범위·처리실적·정책효과와 구분합니다.")
+    crosswalk_path=ROOT/"data/processed/regional_2024/policy_ordinance_geography_crosswalk.csv"
+    if crosswalk_path.exists():
+        with st.expander("법령 후보와 2024 행정코드 교차표"):
+            legal=pd.read_csv(crosswalk_path,dtype=str).fillna("")
+            columns=[name for name in ("policy_name","locality","effective_date","ordinance_serial",
+                     "geography_match_status","matched_sigungu_code_2024","detail_status",
+                     "legal_version_status","source_url") if name in legal]
+            st.dataframe(legal[columns],hide_index=True,
+                         column_config={"source_url":st.column_config.LinkColumn("공식 원문",display_text="원문")})
+            st.download_button("자치법규 코드 교차표 CSV",crosswalk_path.read_bytes(),crosswalk_path.name,"text/csv",key="law_ordinance_crosswalk_download")
+    article_path=ROOT/"data/processed/regional_2024/policy_ordinance_article_evidence.csv"
+    if article_path.exists():
+        articles=pd.read_csv(article_path,dtype=str).fillna("")
+        with st.expander("법령·기관·조문 검색과 원문 근거",expanded=True):
+            query=st.text_input("법령·기관·조문 검색",key="law_ordinance_article_query")
+            selected=filter_ordinance_articles(articles,query)
+            st.caption(f'검색 결과 {len(selected)}행 / 조문 근거 {len(articles)}행')
+            labels={"policy_name":"법령명","locality":"기관","effective_date":"시행일",
+                    "ordinance_serial":"버전 일련번호","article_number":"조문번호","article_title":"조제목",
+                    "text_field":"본문 구분","article_text":"조문 내용","materials_mentioned":"재질 언급",
+                    "topics_mentioned":"주제 언급","source_url":"공식 원문","source_locator":"원문 위치",
+                    "json_pointer":"조문 위치","raw_detail_sha256":"원문 SHA-256",
+                    "legal_version_status":"버전 대조 상태","geography_match_status":"지역 대조 상태"}
+            columns=[name for name in labels if name in selected]
+            st.dataframe(selected[columns].rename(columns=labels),hide_index=True,
+                         column_config={"공식 원문":st.column_config.LinkColumn("공식 원문",display_text="원문")})
+            st.download_button("검색한 조문 근거 CSV",selected.to_csv(index=False).encode("utf-8-sig"),
+                               "ordinance_article_evidence_filtered.csv","text/csv",key="law_ordinance_articles_download")
+            st.caption("원문 위치·조문 위치와 원문 해시는 수집한 버전으로 돌아가 대조하기 위한 정보입니다. 법령의 유효 종료일·개정 전후 적용관계는 별도 확인합니다.")
+
+
 def render_regional_indicator():
     directory=OUTPUT/"reports/regional_indicator"
     path=directory/"manifest.json"
@@ -126,14 +232,27 @@ def render_regional_indicator():
             from src.analysis.regional_indicator_report import run
             run();st.rerun()
         return
-    meta=json.loads(path.read_text(encoding="utf-8"));summary=meta["summary"]
+    meta=json.loads(path.read_text(encoding="utf-8"))
+    current_audit=assess_boundary_audit(ROOT)
+    summary=live_ordinance_view(live_regional_audit_view(meta["summary"],assessment=current_audit))
     st.subheader("2024년 시도별 재질 구성 표준화")
     st.markdown("지역별 4재질 발생량 비중을 전국 실측 발생량 비중으로 고정해 비교합니다. 정책효과나 최종 재생원료 생산률을 나타내지 않습니다.")
     columns=st.columns(4)
     columns[0].metric("시도 관측",f'{summary["sido_rows"]}개')
     columns[1].metric("시군구 자료 연결",f'{summary["sigungu_verified_rows"]}행')
     columns[2].metric("검증된 정책",f'{summary["policy_verified_rows"]}건')
-    columns[3].metric("정책·실적 검증 결합",f'{summary["verified_join_rows"]}행')
+    columns[3].metric("정책·실적 검증 결합",f'{summary["verified_join_rows"]}행' if summary["policy_join_boundary_input_verified"] else "재검증 전")
+    if summary["cached_report_stale"]:
+        st.warning("저장된 보고서의 감사·법령 연결·정책 결합 정보가 현재 입력과 일치하는지 다시 확인해야 합니다. 아래 그림과 다운로드는 과거 생성 결과입니다.")
+    if not summary["policy_join_boundary_input_verified"]:
+        prefix="지리 감사는 현재 유효하지만 저장된 정책·성과 결합의 입력 연결을 다시 확인해야 합니다. " if summary["boundary_input_binding_verified"] else "현재 정책·성과 결합은 지리 근거 재검증 전 상태입니다. "
+        st.info(prefix+f'저장 보고서의 {summary["cached_verified_join_rows"]}행을 현재 검증된 결합으로 표시하지 않습니다. 정책 원문 자체의 검증 건수는 별도로 유지합니다.')
+    if summary["boundary_audit_reasons"]:
+        st.caption("감사 확인 상태: "+summary["administrative_boundary_audit_status"]+" · "+"; ".join(str(reason) for reason in summary["boundary_audit_reasons"]))
+    with st.expander("현재 입력 감사 확인·재생성"):
+        st.code(r".\.venv\Scripts\python scripts/audit_regional_boundaries.py --check-only",language="powershell")
+        st.caption("이 확인 명령은 저장된 입력과 증빙만 검사합니다. 입력이 바뀌었으면 월별 감사를 다시 실행한 뒤 정책 결합과 보고서를 재생성하세요.")
+        st.code(".\\.venv\\Scripts\\python scripts/audit_regional_boundaries.py\n.\\.venv\\Scripts\\python scripts/join_regional_policy.py --year 2024\n.\\.venv\\Scripts\\python run_statistical_analysis.py",language="powershell")
     for key,title,table_name in (("scores","관측 R과 표준화 S","scores"),("contributions","재질별 R-S 기여도","contributions"),("weight_sensitivity","가중치 민감도","weight_sensitivity")):
         figure=artifact_path(f"figures/regional_indicator/{key}.json")
         st.plotly_chart(pio.read_json(figure),width="stretch",key="regional_indicator_"+key)
@@ -154,13 +273,17 @@ def render_regional_indicator():
                 st.dataframe(pd.read_csv(csv_path),hide_index=True)
                 st.download_button(name+" CSV",csv_path.read_bytes(),csv_path.name,"text/csv",key="regional_download_"+name)
         st.warning("R은 재질 구성과 재질별 처리비율의 산술 결합입니다. 회귀 p값은 지표 타당성이나 정책효과를 증명하지 않습니다.")
-    st.info(f'시군구는 이름·2024년 말 코드가 연결된 {summary["sigungu_verified_rows"]}행입니다. 연중 행정경계 검증과 실제 정책 자료가 없어 정책 결합은 {summary["verified_join_rows"]}행입니다.')
+    st.info(regional_boundary_caption(summary))
+    render_ordinance_evidence(summary)
     sigungu_report=OUTPUT/"reports/regional_indicator_sigungu"
     sigungu_manifest=sigungu_report/"manifest.json"
     if sigungu_manifest.exists():
-        county=json.loads(sigungu_manifest.read_text(encoding="utf-8"));county_summary=county["summary"]
+        county=json.loads(sigungu_manifest.read_text(encoding="utf-8"))
+        county_summary=live_ordinance_view(live_regional_audit_view(county["summary"],assessment=current_audit))
         st.divider();st.subheader("시군구 보조 기술 비교")
-        st.caption("2024년 공식 원표 지역명 기준 229개 지역의 R/S 분포입니다. 2024년 말 코드의 연중 경계 검증 전이므로 지도·정책 결합·회귀를 제공하지 않습니다.")
+        st.caption(regional_boundary_caption(county_summary,county_report=True))
+        if county_summary["cached_report_stale"]:
+            st.warning("시군구 보고서도 과거 입력·증빙 상태를 포함한 저장 결과입니다. 현재 자료 확인과 보고서 재생성이 필요합니다.")
         st.metric("시군구 관측",f'{county_summary["sigungu_count"]}개 · {county_summary["material_rows"]} 재질행')
         for key,title,table_name in (("county_scatter","시군구 R과 S","scores"),("county_distribution","분포 비교","scores"),("county_extremes","표준화 상·하위","scores")):
             figure=artifact_path(f"figures/regional_indicator_sigungu/{key}.json")
@@ -170,10 +293,10 @@ def render_regional_indicator():
             st.dataframe(pd.read_csv(county_scores),hide_index=True)
             st.download_button("시군구 지표 CSV",county_scores.read_bytes(),county_scores.name,"text/csv",key="regional_sigungu_scores")
         county_html=sigungu_report/"index.html"
-        if county_html.exists():st.download_button("시군구 오프라인 보고서 HTML",county_html.read_bytes(),county_html.name,"text/html",key="regional_sigungu_html")
+        if county_html.exists():st.download_button("시군구 오프라인 보고서 HTML"+(" (과거 저장 결과)" if county_summary["cached_report_stale"] else ""),county_html.read_bytes(),county_html.name,"text/html",key="regional_sigungu_html")
     for name in ("index.html","report.md"):
         file=directory/name
-        if file.exists():st.download_button("지역 분석 보고서 "+name,file.read_bytes(),name,"text/html" if name.endswith("html") else "text/markdown",key="regional_report_"+name)
+        if file.exists():st.download_button("지역 분석 보고서 "+name+(" (과거 저장 결과)" if summary["cached_report_stale"] else ""),file.read_bytes(),name,"text/html" if name.endswith("html") else "text/markdown",key="regional_report_"+name)
 
 def render_recycling_indicator():
     st.subheader("재활용률의 국제 비교: 지표 설계와 근거")
@@ -198,14 +321,19 @@ def render_recycling_indicator():
     st.info("현재 국내 자료는 처리량입니다. 새 최종 H/S 국가값과 특정 정책의 인과효과는 아직 식별되지 않았습니다. 아래 실측 그림과 가상 설명을 구분해 확인하세요.")
     st.caption("0.2·0.3·0.5는 한국 EPR 의무율 산정용 과거 실적 가중치입니다. 통상 의무율 산정연도 t에서 t−4·t−3·t−2에 적용하며 국가 연간 실적률의 보편 산식과 다릅니다.")
     from src.analysis.recycling_indicator_report import CHARTS
-    actual,examples=st.tabs(["실제 통계·문헌 사례","지표 작동 설명·인과 경로"])
-    for container,names in [(actual,["swiss_stages","nea_scope","kosis_energy","regional_scores"]),
+    actual,robust,examples=st.tabs(["실제 통계·문헌·기관 모형","가중치 범위 전체의 비교","지표 작동 설명·인과 경로"])
+    for container,names in [(actual,["swiss_stages","nea_scope","kosis_energy","regional_scores","jrc_plastics"]),
+                            (robust,["weight_pair_counts","weight_pair_matrix"]),
                             (examples,["composition_example","time_methods","partial_bounds","mass_flow"])]:
         with container:
             for name in names:
                 _,title,label,note,_=CHARTS[name]
                 st.markdown("**"+title+"**");st.caption(label)
-                st.plotly_chart(pio.read_json(artifact_path(f"figures/recycling_indicator/{name}.json")),width="stretch",key="indicator_"+name)
+                figure=artifact_path(f"figures/recycling_indicator/{name}.json")
+                if not figure.exists():
+                    st.info("이 그림은 2026-11-19 후속 보고서를 재생성하면 표시됩니다.")
+                    continue
+                st.plotly_chart(pio.read_json(figure),width="stretch",key="indicator_"+name)
                 st.write(note)
                 with st.expander("수치 CSV·발표용 PNG/SVG"):
                     for extension,folder,mime in [("csv","tables","text/csv"),("png","figures","image/png"),("svg","figures","image/svg+xml")]:
@@ -214,13 +342,41 @@ def render_recycling_indicator():
         if container is examples:
             with container:
                 st.image(str(artifact_path("figures/recycling_indicator/causal_dag.png")),caption="인과 가설. 지역·시장 여건의 교란은 구성 표준화만으로 제거되지 않습니다.")
+    with robust:
+        st.caption("모든 비교에서 두 지역에 같은 가중치를 적용합니다. 허용 집합은 민감도 시나리오이며 확률분포나 합의된 최적 가중치가 아닙니다. 비음수 전체 검토에는 가중치 0의 극단도 포함합니다.")
+        counts_path=artifact_path("tables/recycling_indicator/weight_pair_counts.csv")
+        if counts_path.exists():
+            counts=pd.read_csv(counts_path)
+            st.dataframe(counts[["가중치 범위","pair_count","nonreversal_pairs","indeterminate_pairs"]].rename(columns={"pair_count":"전체 지역쌍","nonreversal_pairs":"방향 유지","indeterminate_pairs":"역전 가능"}),hide_index=True)
+            selected=st.selectbox("비교할 가중치 허용 범위",counts["가중치 범위"].tolist(),key="indicator_weight_domain")
+            domain=counts.loc[counts["가중치 범위"].eq(selected),"domain"].iloc[0]
+            pairs=pd.read_csv(artifact_path("tables/recycling_indicator/weight_comparisons.csv"))
+            pairs=pairs.loc[pairs.domain.eq(domain)]
+            display_pairs=pairs[["entity_a","entity_b","gap_lower_pp","gap_upper_pp","comparison"]].copy()
+            display_pairs["comparison"]=display_pairs.comparison.map({"a_strict":"A가 항상 높음","b_strict":"B가 항상 높음","a_no_reversal":"A가 낮아지지 않음·동점 가능","b_no_reversal":"B가 낮아지지 않음·동점 가능","tie":"항상 동점","indeterminate":"우열이 달라질 수 있음"})
+            st.dataframe(display_pairs.rename(columns={"entity_a":"지역 A","entity_b":"지역 B","gap_lower_pp":"A−B 최소차(%p)","gap_upper_pp":"A−B 최대차(%p)","comparison":"비교 분류"}),hide_index=True)
+            with st.expander("비교를 재현하는 가중치·순위 외곽 범위"):
+                pair_labels=[f'{row.entity_a} / {row.entity_b}' for row in pairs.itertuples()]
+                chosen=st.selectbox("극값 가중치를 확인할 지역쌍",pair_labels,key="indicator_weight_pair")
+                pair=pairs.iloc[pair_labels.index(chosen)]
+                witness=pd.read_csv(artifact_path("tables/recycling_indicator/weight_witnesses.csv"))
+                witness=witness.loc[witness.domain.eq(domain)&witness.entity_a.eq(pair.entity_a)&witness.entity_b.eq(pair.entity_b)]
+                witness=witness.copy();witness["endpoint"]=witness.endpoint.map({"lower":"A−B 최소차","upper":"A−B 최대차"})
+                st.dataframe(witness[["endpoint","material","weight","rate_a","rate_b","gap_contribution_pp"]].rename(columns={"endpoint":"극값 방향","material":"재질","weight":"공통 가중치","rate_a":"A 처리비율(0–1)","rate_b":"B 처리비율(0–1)","gap_contribution_pp":"차이 기여도(%p)"}),hide_index=True)
+                ranks=pd.read_csv(artifact_path("tables/recycling_indicator/weight_rank_outer.csv"))
+                st.dataframe(ranks.loc[ranks.domain.eq(domain),["entity","rank_lower_outer","rank_upper_outer","score_lower_pct","score_upper_pct"]].rename(columns={"entity":"시도","rank_lower_outer":"순위 외곽 하한","rank_upper_outer":"순위 외곽 상한","score_lower_pct":"점수 하한(%)","score_upper_pct":"점수 상한(%)"}),hide_index=True)
+                st.caption("순위는 쌍별 보장에서 얻은 보수적 외곽 범위입니다. 양 끝 순위가 실제 하나의 가중치에서 달성된다는 보장은 없으며 신뢰구간이 아닙니다.")
+                for name in ("weight_comparisons","weight_witnesses","weight_rank_outer","weight_reference_vertices","weight_domain_bounds"):
+                    path=artifact_path(f"tables/recycling_indicator/{name}.csv")
+                    st.download_button(name+" CSV",path.read_bytes(),path.name,"text/csv",key="indicator_download_"+name)
     with st.expander("전체 연구·근거·독립 검증 계획"):
         st.markdown("측정 경계 감사 → 독립 최종 산출과의 일치 → 국가·가중치 민감도 → 정책 패널 인과분석 → 환경·비용 검증 순서로 진행합니다. 산식의 단조성·구성 불변성은 프로그램으로 검증하며 정책 인과효과는 추가 식별이 필요합니다.")
         sources=pd.read_csv(artifact_path("tables/recycling_indicator/sources.csv"))
         st.dataframe(sources[["source_id","title","year","verified","contribution","limitation"]],hide_index=True)
-    for filename,label,mime in [("index.html","대화형 연구 보고서 HTML","text/html"),("study.md","전체 연구 논증 Markdown","text/markdown"),("sources.json","출처·확인 범위 JSON","application/json")]:
+    for filename,label,mime in [("index.html","대화형 연구 보고서 HTML","text/html"),("study.md","초기 연구 논증 Markdown","text/markdown"),("weight_robustness.md","가중치 후속 논증 Markdown","text/markdown"),("followup_evidence.md","추가 근거 확인 Markdown","text/markdown"),("sources.json","출처·확인 범위 JSON","application/json")]:
         path=directory/filename
-        st.download_button(label,path.read_bytes(),filename,mime,key="indicator_report_"+filename)
+        if path.exists():
+            st.download_button(label,path.read_bytes(),filename,mime,key="indicator_report_"+filename)
 
 
 def main():

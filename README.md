@@ -14,15 +14,25 @@ python -m venv .venv
 
 한국 0.2·0.3·0.5는 국가 연간 재활용 실적률의 보편 가중치가 아니라 EPR **재활용의무율 설정용** 과거 실적 가중치입니다. 현재 KOSIS 자료는 최종 재생원료 산출량이 아닌 처리량이므로 새 H/S의 국가 관측 순위·정책 인과효과는 미산출 상태로 명시합니다.
 
+## 2026-11-19 후속 연구: 가중치 범위 전체의 비교
+
+초기 22개 근거·9개 그림에 [추가 근거 3항목](data/indicator_followup_sources.json)과 그림 3개를 더해 현재 보고서는 **근거 25항목·그림 12개**입니다. [후속 방법·결과](docs/indicator_weight_robustness_2026-11-19.md)는 두 지역에 같은 가중치를 적용해 허용 범위 전체의 비교가 유지되는지 검증합니다. KOSIS 2024년 17개 시도 136쌍 중, 세 기준 가중치의 모든 혼합에서는 123쌍, 재질별 최소·최대 경계 전체에서는 118쌍, 비음수 가중치 전체에서는 83쌍의 비교 방향이 유지됩니다. 극값을 만드는 가중치·재질 기여도와 보수적 순위 외곽 범위를 CSV로 재현합니다.
+
+같은 실행 명령으로 보고서를 갱신하며 앱의 **재활용 지표 연구 → 가중치 범위 전체의 비교**에서 결과를 확인합니다. 가중치 집합은 민감도 시나리오이고 순위 범위는 신뢰구간이 아닙니다. [JRC 2025 모형과 Eurostat 2026 공표의 확인 범위](docs/indicator_followup_evidence_2026-11-19.md)도 추가했습니다. 이 자료를 최종 H/S 국가 실측값이나 정책 인과효과로 전환하지 않습니다.
+
 ## 기존 통계 분석
 
 국내외 폐기물 실데이터를 Python으로 수집·정제·분석하고, 질문별 표·그래프·출처·한계를 재현하는 연구 프로젝트입니다. 기본 보고서는 **독립 분석 9개**를 제공합니다. 별도 지역 연구 보고서는 2024년 `R_r/S_r` 표준화와 가중치 민감도를 분석합니다. 기존 정책 계산은 별도의 **가정 기반 민감도 분석**입니다.
 
 [대화형 통계 보고서](outputs/reports/statistical_analysis/index.html) · [개편 결과·검증](docs/statistical_refactor_report_2026-11-16.md) · [분석 사용법](docs/statistical_analysis_guide.md) · [선행연구](docs/literature_review.md)
 
-[시도 표준화 분석 방법](docs/regional_policy_indicator_method.md) · [지역 자료 공백](docs/regional_data_gap_inventory.md) · [기관 자료요청 양식](docs/regional_data_request_template.md)
+[시도 표준화 분석 방법](docs/regional_policy_indicator_method.md) · [지역 자료 공백](docs/regional_data_gap_inventory.md) · [조례 연혁 후보 검토](docs/regional_ordinance_candidate_review_2026-11-19.md) · [기관 자료요청 양식](docs/regional_data_request_template.md)
 
 ## 실행
+
+월별 경계 감사는 이제 현재 시군구 코드·명칭, 12월 코드 목록, 월별 자료와 원문 페이지의 지문이 맞아야 유효합니다. 네트워크 없이 상태만 확인하려면 `python scripts/audit_regional_boundaries.py --check-only`를 사용합니다. 입력이 달라지거나 기존 감사에 지문이 없으면 과거 완료·정책 결합을 현재 검증으로 인정하지 않습니다. [감사 증빙 계약과 재현 순서](docs/boundary_evidence_contract_2026-11-20.md)를 참고하세요.
+
+법령정보는 지역 연구 메뉴에서 법령명·기관·조문으로 검색할 수 있습니다. 최신 로컬 수집은 연혁 후보 659버전·본문 60건이며, 조문·부칙 등 1,031개 텍스트 항목에 버전 일련번호·조문 위치·원문 해시·인증값 없는 공개 열람 링크를 연결했습니다. `python scripts/link_law_ordinances.py`로 연결표를 만들고 `--check-only`로 현재 원문·입력의 일치를 확인합니다. 시행일이 2024년인 연혁 검색과 실제 운영정책·연중 유효성을 구분하며, [실자료 결과와 재현 방법](docs/regional_ordinance_candidate_review_2026-11-19.md)을 제공합니다.
 
 기존 가상환경에서는 한 명령으로 저장한 실데이터의 표·PNG/SVG·대화형 그래프·보고서를 다시 만듭니다. 기본 재생성은 네트워크나 API 키를 사용하지 않습니다.
 
@@ -50,10 +60,12 @@ python -m venv .venv
 ```powershell
 .\.venv\Scripts\python scripts/collect_regional_recycling.py --source kr_waste_2024_detail --year 2024 --dry-run
 .\.venv\Scripts\python scripts/collect_regional_recycling.py --source kr_admin_codes_2024 --year 2024 --dry-run
+.\.venv\Scripts\python scripts/collect_law_ordinances.py --limit-pages 30 --details 20
+.\.venv\Scripts\python scripts/link_law_ordinances.py
 .\.venv\Scripts\python scripts/join_regional_policy.py --year 2024
 ```
 
-`kr_admin_codes_2024` 갱신에는 별도 `MOIS_API_KEY`가 필요합니다. 수거정책 자료는 검증 가능한 원문이 아직 확보되지 않아 자동 수집·결합하지 않습니다. 검증된 정책 후보를 받으면 `data/processed/regional_2024/policy_candidates_unverified.csv`에 근거 필드를 채운 뒤 결합 명령으로 재검증합니다. API 응답·정책 자료의 상태는 [공백 인벤토리](docs/regional_data_gap_inventory.md)에 기록합니다.
+`kr_admin_codes_2024` 갱신에는 별도 `MOIS_API_KEY`가 필요합니다. 법제처 자치법규 연혁은 `LAW_OC` 설정 후 `scripts/collect_law_ordinances.py`로 후보를 검색할 수 있으며, 조례만으로 실제 시행을 확정하지 않습니다. API 신청과 도메인/IP 설정은 [법제처 API 설정](docs/law_api_setup.md), 자료 공백은 [공백 인벤토리](docs/regional_data_gap_inventory.md)를 확인합니다.
 
 ## 현재 분석
 
@@ -123,7 +135,9 @@ JODAL=...
 .\.venv\Scripts\python scripts/run_regional_indicator.py --year 2024 --level sigungu
 ```
 
-현재 로컬의 공식 원표 처리 결과는 시군구 229곳, 4개 재질 916행입니다. `R`은 해당 지역의 실제 재질 구성으로 집계한 처리비율이고 `S`는 모든 지역에 KOSIS 전국 재질 발생 비중을 적용한 비교값입니다. 시군구 결과는 기술 비교이며, 2024년 연중 행정경계 감사와 정책 자료 결합이 끝날 때까지 지도·정책 순위·시군구 회귀로 해석하지 않습니다. 원자료와 처리 데이터는 배포 권한을 확인하기 전 저장소에 포함하지 않으므로, 새 환경에서는 지역 자료 수집 및 전처리가 먼저 필요합니다.
+현재 로컬의 공식 원표 처리 결과는 시군구 229곳, 4개 재질 916행입니다. `R`은 해당 지역의 실제 재질 구성으로 집계한 처리비율이고 `S`는 모든 지역에 KOSIS 전국 재질 발생 비중을 적용한 비교값입니다. 2024년 월별 행정코드·명칭 대조는 완료되어 통계단위의 코드·명칭 안정성이 확인됐습니다. 법제처 조례 연혁 659버전 중 523버전은 통계지역 코드와 정확히 연결됐지만, 실제 운영정책 검증 및 정책-성과 결합은 0건·0행입니다. 법적 경계 도형은 조사하지 않아 결과는 기술 비교로 해석합니다. 원자료와 처리 데이터는 배포 권한을 확인하기 전 저장소에 포함하지 않으므로, 새 환경에서는 지역 자료 수집 및 전처리가 먼저 필요합니다.
+
+행정코드 감사의 범위와 법제처 조례후보 수집 설정은 [자료 공백 현황](docs/regional_data_gap_inventory.md)과 [법제처 API 설정](docs/law_api_setup.md)을 확인하세요.
 
 ## 검증
 
