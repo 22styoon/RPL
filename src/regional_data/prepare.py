@@ -36,6 +36,16 @@ def prepare(root=ROOT,year=2024):
     if checkpoint.exists():
         codes=normalize_mois(json.loads(checkpoint.read_text(encoding="utf-8")))
     codes.to_csv(directory/"admin_codes_202412.csv",index=False,encoding="utf-8-sig")
+    audit_path=directory/"boundary_audit_manifest.json"
+    audit=json.loads(audit_path.read_text(encoding="utf-8")) if audit_path.exists() else {}
+    audit_summary=audit.get("summary",{})
+    boundary_audit_ok=(audit.get("status")=="complete"
+        and audit_summary.get("statistical_code_name_roster_stable") is True
+        and audit_summary.get("statistical_unit_count")==229
+        and audit_summary.get("monthly_missing_statistical_codes")==0
+        and audit_summary.get("monthly_name_mismatches")==0)
+    metadata_code_snapshot=("2024_monthly_code_name_roster_stable_geometry_not_assessed"
+        if boundary_audit_ok else "202412_not_a_midyear_boundary_audit")
     candidate_columns=["sido_name","sigungu_name","material","reference_year","generated_t","material_recycling_t","sido_code","sigungu_code","source_id","source_url","source_locator","retrieved_at","verification_status","compatibility_status","measurement_stage","waste_scope"]
     counties=pd.DataFrame(columns=candidate_columns);exclusions=[]
     latest=root/"data/raw/regional_2024/kr_waste_2024_detail/latest.json"
@@ -67,7 +77,9 @@ def prepare(root=ROOT,year=2024):
                     exclusions.append(dict(geography=row.geography,material=row.material,reason=reason,source_locator=row.source_locator))
                 else:
                     counties.loc[index,"verification_status"]="verified"
-                    counties.loc[index,"compatibility_status"]="name_and_202412_code_match_midyear_boundary_not_audited"
+                    counties.loc[index,"compatibility_status"]=(
+                        "name_and_202412_code_match_2024_monthly_code_name_roster_stable_geometry_not_assessed"
+                        if boundary_audit_ok else "name_and_202412_code_match_midyear_boundary_not_audited")
             counties.to_csv(directory/"sigungu_2024_materials_candidates.csv",index=False,encoding="utf-8-sig")
     verified=counties.loc[counties.verification_status=="verified"].copy()
     if not verified.empty:
@@ -91,7 +103,9 @@ def prepare(root=ROOT,year=2024):
     result=dict(reference_year=year,sido_rows=len(regions),sigungu_candidates=len(counties),
         sigungu_verified_rows=len(verified),sigungu_verified_regions=verified.sigungu_code.nunique() if len(verified) else 0,
         policy_candidates=len(policies),policy_verified_rows=int(policies.evidence_status.eq("verified").sum()),
-        verified_join_rows=len(joined),metadata_code_snapshot="202412_not_a_midyear_boundary_audit",
+        verified_join_rows=len(joined),metadata_code_snapshot=metadata_code_snapshot,
+        administrative_boundary_audit_status="code_name_roster_stable" if boundary_audit_ok else "not_audited",
+        administrative_boundary_audit_geometry_assessed=False,
         reconciliation_rows=len(reconciliation),external_validity="not_assessable_no_compatible_independent_indicator")
     dump(directory/"manifest.json",result)
     return result

@@ -154,13 +154,33 @@ def render_regional_indicator():
                 st.dataframe(pd.read_csv(csv_path),hide_index=True)
                 st.download_button(name+" CSV",csv_path.read_bytes(),csv_path.name,"text/csv",key="regional_download_"+name)
         st.warning("R은 재질 구성과 재질별 처리비율의 산술 결합입니다. 회귀 p값은 지표 타당성이나 정책효과를 증명하지 않습니다.")
-    st.info(f'시군구는 이름·2024년 말 코드가 연결된 {summary["sigungu_verified_rows"]}행입니다. 연중 행정경계 검증과 실제 정책 자료가 없어 정책 결합은 {summary["verified_join_rows"]}행입니다.')
+    if summary.get("administrative_boundary_audit_status") == "code_name_roster_stable":
+        st.info(f'시군구 {summary["sigungu_verified_rows"]}행의 2024년 월별 코드·명칭 대조가 완료됐습니다. GIS 경계 도형은 평가하지 않았고, 실제 정책 자료가 없어 정책 결합은 {summary["verified_join_rows"]}행입니다.')
+    else:
+        st.info(f'시군구는 이름·2024년 말 코드가 연결된 {summary["sigungu_verified_rows"]}행입니다. 월별 코드·명칭 감사가 끝나지 않았고 실제 정책 자료가 없어 정책 결합은 {summary["verified_join_rows"]}행입니다.')
+    ordinance_versions=summary.get("law_ordinance_version_candidates",0)
+    if ordinance_versions:
+        st.caption(
+            f'법제처 자치법규 연혁 후보 {ordinance_versions}버전(고유 ID {summary.get("law_ordinance_unique_ids",0)}개) 중 '
+            f'2024년 통계단위 코드 일치 {summary.get("law_ordinance_matched_statistical_unit_rows",0)}행, '
+            f'시도 단위 {summary.get("law_ordinance_sido_only_rows",0)}행, 미매칭 {summary.get("law_ordinance_unmatched_rows",0)}행입니다. '
+            f'본문 {summary.get("law_ordinance_detail_json_count",0)}건을 받았으며, 실제 운영정책 증거와 구분합니다.'
+        )
+        crosswalk_path=ROOT/"data/processed/regional_2024/policy_ordinance_geography_crosswalk.csv"
+        if crosswalk_path.exists():
+            with st.expander("자치법규 후보와 2024 행정코드 교차표"):
+                legal=pd.read_csv(crosswalk_path,dtype=str).fillna("")
+                columns=["policy_name","locality","effective_date","geography_match_status","matched_sigungu_code_2024","candidate_status"]
+                columns=[column for column in columns if column in legal]
+                st.dataframe(legal[columns],hide_index=True)
+                st.download_button("자치법규 코드 교차표 CSV",crosswalk_path.read_bytes(),crosswalk_path.name,"text/csv",key="law_ordinance_crosswalk_download")
+                st.caption("코드 연결은 후보 탐색용입니다. 법령만으로 2024년 실제 시행·대상범위·성과를 확인하지 않았습니다.")
     sigungu_report=OUTPUT/"reports/regional_indicator_sigungu"
     sigungu_manifest=sigungu_report/"manifest.json"
     if sigungu_manifest.exists():
         county=json.loads(sigungu_manifest.read_text(encoding="utf-8"));county_summary=county["summary"]
         st.divider();st.subheader("시군구 보조 기술 비교")
-        st.caption("2024년 공식 원표 지역명 기준 229개 지역의 R/S 분포입니다. 2024년 말 코드의 연중 경계 검증 전이므로 지도·정책 결합·회귀를 제공하지 않습니다.")
+        st.caption("2024년 공식 원표 지역명 기준 229개 지역의 R/S 분포입니다. 월별 코드·명칭 대조는 완료됐으나 GIS 경계 도형과 정책 적용권역은 미확인 상태이므로 지도·정책 효과 회귀를 제공하지 않습니다.")
         st.metric("시군구 관측",f'{county_summary["sigungu_count"]}개 · {county_summary["material_rows"]} 재질행')
         for key,title,table_name in (("county_scatter","시군구 R과 S","scores"),("county_distribution","분포 비교","scores"),("county_extremes","표준화 상·하위","scores")):
             figure=artifact_path(f"figures/regional_indicator_sigungu/{key}.json")

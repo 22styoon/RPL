@@ -4,7 +4,7 @@
 
 [대화형 통계 보고서](outputs/reports/statistical_analysis/index.html) · [개편 결과·검증](docs/statistical_refactor_report_2026-11-16.md) · [분석 사용법](docs/statistical_analysis_guide.md) · [선행연구](docs/literature_review.md)
 
-[시도 표준화 분석 방법](docs/regional_policy_indicator_method.md) · [지역 자료 공백](docs/regional_data_gap_inventory.md) · [기관 자료요청 양식](docs/regional_data_request_template.md)
+[시도 표준화 분석 방법](docs/regional_policy_indicator_method.md) · [지역 자료 공백](docs/regional_data_gap_inventory.md) · [조례 연혁 후보 검토](docs/regional_ordinance_candidate_review_2026-11-19.md) · [기관 자료요청 양식](docs/regional_data_request_template.md)
 
 ## 실행
 
@@ -34,10 +34,12 @@ python -m venv .venv
 ```powershell
 .\.venv\Scripts\python scripts/collect_regional_recycling.py --source kr_waste_2024_detail --year 2024 --dry-run
 .\.venv\Scripts\python scripts/collect_regional_recycling.py --source kr_admin_codes_2024 --year 2024 --dry-run
+.\.venv\Scripts\python scripts/collect_law_ordinances.py --limit-pages 30 --details 20
+.\.venv\Scripts\python scripts/link_law_ordinances.py
 .\.venv\Scripts\python scripts/join_regional_policy.py --year 2024
 ```
 
-`kr_admin_codes_2024` 갱신에는 별도 `MOIS_API_KEY`가 필요합니다. 수거정책 자료는 검증 가능한 원문이 아직 확보되지 않아 자동 수집·결합하지 않습니다. 검증된 정책 후보를 받으면 `data/processed/regional_2024/policy_candidates_unverified.csv`에 근거 필드를 채운 뒤 결합 명령으로 재검증합니다. API 응답·정책 자료의 상태는 [공백 인벤토리](docs/regional_data_gap_inventory.md)에 기록합니다.
+`kr_admin_codes_2024` 갱신에는 별도 `MOIS_API_KEY`가 필요합니다. 법제처 자치법규 연혁은 `LAW_OC` 설정 후 `scripts/collect_law_ordinances.py`로 후보를 검색할 수 있으며, 조례만으로 실제 시행을 확정하지 않습니다. API 신청과 도메인/IP 설정은 [법제처 API 설정](docs/law_api_setup.md), 자료 공백은 [공백 인벤토리](docs/regional_data_gap_inventory.md)를 확인합니다.
 
 ## 현재 분석
 
@@ -107,7 +109,9 @@ JODAL=...
 .\.venv\Scripts\python scripts/run_regional_indicator.py --year 2024 --level sigungu
 ```
 
-현재 로컬의 공식 원표 처리 결과는 시군구 229곳, 4개 재질 916행입니다. `R`은 해당 지역의 실제 재질 구성으로 집계한 처리비율이고 `S`는 모든 지역에 KOSIS 전국 재질 발생 비중을 적용한 비교값입니다. 시군구 결과는 기술 비교이며, 2024년 연중 행정경계 감사와 정책 자료 결합이 끝날 때까지 지도·정책 순위·시군구 회귀로 해석하지 않습니다. 원자료와 처리 데이터는 배포 권한을 확인하기 전 저장소에 포함하지 않으므로, 새 환경에서는 지역 자료 수집 및 전처리가 먼저 필요합니다.
+현재 로컬의 공식 원표 처리 결과는 시군구 229곳, 4개 재질 916행입니다. `R`은 해당 지역의 실제 재질 구성으로 집계한 처리비율이고 `S`는 모든 지역에 KOSIS 전국 재질 발생 비중을 적용한 비교값입니다. 2024년 월별 행정코드·명칭 대조는 완료되어 통계단위의 코드·명칭 안정성이 확인됐습니다. 법제처 조례 연혁 659버전 중 523버전은 통계지역 코드와 정확히 연결됐지만, 실제 운영정책 검증 및 정책-성과 결합은 0건·0행입니다. 법적 경계 도형은 조사하지 않아 결과는 기술 비교로 해석합니다. 원자료와 처리 데이터는 배포 권한을 확인하기 전 저장소에 포함하지 않으므로, 새 환경에서는 지역 자료 수집 및 전처리가 먼저 필요합니다.
+
+행정코드 감사의 범위와 법제처 조례후보 수집 설정은 [자료 공백 현황](docs/regional_data_gap_inventory.md)과 [법제처 API 설정](docs/law_api_setup.md)을 확인하세요.
 
 ## 검증
 
