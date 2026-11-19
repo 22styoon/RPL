@@ -126,3 +126,87 @@ def test_empty_candidate_search_returns_headed_empty_crosswalk_and_zero_summary(
                 "verified_outcome_join_rows"]:
         assert summary[key] == 0
     assert summary["match_status_counts"] == {}
+
+
+@pytest.mark.parametrize("input_name", ["codes", "waste"])
+@pytest.mark.parametrize("field,expected,wrong", [
+    ("code_reference_month", "202412", "202512"),
+    ("reference_month", "202412", "202401"),
+    ("reference_year", "2024", "2025"),
+])
+def test_explicit_mixed_geographic_periods_are_rejected(codes, waste_units, input_name, field, expected, wrong):
+    frame = codes if input_name == "codes" else waste_units
+    frame[field] = expected
+    frame.loc[frame.index[-1], field] = wrong
+    with pytest.raises(ValueError, match=field):
+        link_ordinance_geography(candidates("서울특별시 중구"), codes, waste_units)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("code_reference_month", "202311"), ("reference_month", "202501"),
+    ("reference_year", "2023"), ("code_reference_month", ""),
+])
+def test_uniform_wrong_or_blank_period_is_not_relabeled_as_december_2024(codes, waste_units, field, value):
+    codes[field] = value
+    with pytest.raises(ValueError, match=field):
+        link_ordinance_geography(candidates("서울특별시 중구"), codes, waste_units)
+
+
+def test_explicit_consistent_periods_match_legacy_inputs_without_mutation(codes, waste_units):
+    before, _ = link_ordinance_geography(candidates("서울특별시 중구"), codes, waste_units)
+    codes = codes.assign(code_reference_month="202412", reference_month="202412", reference_year=2024)
+    waste_units = waste_units.assign(code_reference_month="202412", reference_year=2024)
+    codes_before, waste_before = codes.copy(deep=True), waste_units.copy(deep=True)
+    after, summary = link_ordinance_geography(candidates("서울특별시 중구"), codes, waste_units)
+    pd.testing.assert_frame_equal(before, after)
+    pd.testing.assert_frame_equal(codes, codes_before)
+    pd.testing.assert_frame_equal(waste_units, waste_before)
+    assert summary["verified_outcome_join_rows"] == 0
+
+
+def test_ambiguous_province_name_to_code_is_rejected_before_province_only_link(codes, waste_units):
+    codes.loc[codes.sigungu_name.eq("중구") & codes.sido_name.eq("서울"), "sido_code"] = "12"
+    with pytest.raises(ValueError, match="ambiguous province"):
+        link_ordinance_geography(candidates("서울특별시"), codes, waste_units)
+
+
+def test_province_code_with_conflicting_names_is_rejected(codes, waste_units):
+    codes.loc[codes.sido_name.eq("부산"), "sido_code"] = "11"
+    with pytest.raises(ValueError, match="ambiguous province"):
+        link_ordinance_geography(candidates("서울특별시 중구"), codes, waste_units)
+
+
+def test_same_county_code_with_conflicting_identity_is_rejected(codes, waste_units):
+    codes.loc[codes.sigungu_name.eq("강남구"), "sigungu_code"] = "1114000000"
+    with pytest.raises(ValueError, match="conflicting identity"):
+        link_ordinance_geography(candidates("서울특별시 중구"), codes, waste_units)
+
+
+def test_repeated_material_rows_cannot_disagree_about_county_identity(codes, waste_units):
+    names = dict(zip(codes.sigungu_code, codes.sigungu_name))
+    waste_units["sigungu_name"] = waste_units.sigungu_code.map(names)
+    waste_units.loc[0, "sigungu_name"] = "다른구"
+    with pytest.raises(ValueError, match="conflicting identity"):
+        link_ordinance_geography(candidates("서울특별시 강남구"), codes, waste_units)
+
+
+def test_shared_code_must_have_same_name_in_waste_and_admin_inputs(codes, waste_units):
+    names = dict(zip(codes.sigungu_code, codes.sigungu_name))
+    waste_units["sigungu_name"] = waste_units.sigungu_code.map(names)
+    waste_units.loc[waste_units.sigungu_code.eq("1114000000"), "sigungu_name"] = "이름변경구"
+    with pytest.raises(ValueError, match="MOIS and waste inputs disagree"):
+        link_ordinance_geography(candidates("서울특별시 중구"), codes, waste_units)
+
+
+def test_identical_admin_records_are_not_ambiguous(codes, waste_units):
+    repeated = pd.concat([codes, codes.loc[codes.sigungu_code.eq("1114000000")]], ignore_index=True)
+    linked, summary = link_ordinance_geography(candidates("서울특별시 중구"), repeated, waste_units)
+    assert linked.matched_sigungu_code_2024.tolist() == ["1114000000"]
+    assert summary["matched_waste_statistical_unit_rows"] == 1
+    assert summary["verified_outcome_join_rows"] == 0
+
+
+def test_null_locality_is_missing_without_guessing_a_region(codes, waste_units):
+    linked, _ = link_ordinance_geography(candidates(pd.NA, float("nan")), codes, waste_units)
+    assert linked.geography_match_status.eq("locality_missing").all()
+    assert linked.matched_sigungu_code_2024.eq("").all()

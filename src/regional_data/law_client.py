@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 import hashlib
 import json
 import re
+import unicodedata
 import pandas as pd
 from zoneinfo import ZoneInfo
 
@@ -182,13 +183,165 @@ def _validate_detail(payload, candidate):
         raise ValueError("LAW_API_DETAIL_IDENTITY_MISSING")
     expected_serial = str(candidate.get("ordinance_serial") or "").strip()
     expected_id = str(candidate.get("ordinance_id") or "").strip()
-    if not any((not expected_serial or _get(node, "serial") == expected_serial)
-               and (not expected_id or _get(node, "id") == expected_id) for node in identities):
+    matching = [node for node in identities
+                if (not expected_serial or _get(node, "serial") == expected_serial)
+                and (not expected_id or _get(node, "id") == expected_id)]
+    if not matching:
         raise ValueError("LAW_API_DETAIL_IDENTITY_MISMATCH")
+    if any(not _metadata_matches(node, candidate) for node in matching):
+        raise ValueError("LAW_API_DETAIL_METADATA_MISMATCH")
     content_fields = {"조내용", "부칙내용", "개정문내용", "제개정이유내용"}
     if not any(key in content_fields and isinstance(value, str) and value.strip()
                for node in nodes for key, value in node.items()):
         raise ValueError("LAW_API_DETAIL_BODY_UNVERIFIED")
+
+
+def _metadata_matches(record, candidate):
+    """Reject explicit metadata disagreement; missing optional fields stay missing."""
+    for field, column in (("name", "policy_name"), ("locality", "locality"),
+                          ("promulgated", "promulgation_date"), ("effective", "effective_date")):
+        expected = " ".join(str(candidate.get(column) or "").split())
+        actual = " ".join(_get(record, field).split())
+        if not expected or not actual:
+            continue
+        if field == "name":
+            expected, actual = normalize_legal_title(expected), normalize_legal_title(actual)
+        elif field in {"promulgated", "effective"}:
+            expected, actual = _date_key(expected), _date_key(actual)
+        if actual != expected:
+            return False
+    return True
+
+
+def normalize_legal_title(value):
+    """Compare title typography while preserving stored source strings.
+
+    The list/body APIs use U+00B7 and U+318D for the same title separator.
+    This narrow equivalence is for legal titles only, never locality matching.
+    """
+    text = unicodedata.normalize("NFC", str(value or "")).replace("ㆍ", "·")
+    return " ".join(text.split())
+
+
+def _date_key(value):
+    if re.fullmatch(r"\d{8}", value):
+        return value
+    parts = re.fullmatch(r"(\d{4})\D+(\d{1,2})\D+(\d{1,2})\D*", value)
+    return "".join((parts[1], parts[2].zfill(2), parts[3].zfill(2))) if parts else value
+
+
+def _collection_path(root, value):
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("LAW_COLLECTION_SOURCE_PATH_INVALID")
+    path = (root / value).resolve()
+    if not path.is_relative_to(root) or not path.is_file():
+        raise ValueError("LAW_COLLECTION_SOURCE_MISSING_OR_OUTSIDE_ROOT")
+    return path
+
+
+def validate_collection_evidence(root, manifest, candidate_csv=None):
+    """Validate locally stored collection inputs without credentials or network.
+
+    Successful and partial collections can supply legal document candidates.
+    File hashes prove that these are the recorded inputs, not that a policy was
+    implemented. ``candidate_csv`` may select a current CSV path inside root.
+    Missing, changed, legacy, or contradictory evidence raises a safe code.
+    """
+    root = Path(root).resolve()
+    try:
+        if not isinstance(manifest, dict):
+            raise ValueError("LAW_COLLECTION_MANIFEST_INVALID")
+        csv_path = _collection_path(root, str(candidate_csv) if candidate_csv is not None
+                                    else manifest.get("candidate_csv"))
+        if (not re.fullmatch(r"[0-9a-f]{64}", str(manifest.get("candidate_sha256", "")))
+                or hashlib.sha256(csv_path.read_bytes()).hexdigest() != manifest["candidate_sha256"]):
+            raise ValueError("LAW_COLLECTION_CANDIDATE_CHANGED")
+        candidates = pd.read_csv(csv_path, dtype=str, keep_default_na=False)
+        required = {"ordinance_id", "ordinance_serial", "policy_name", "promulgation_date",
+                    "effective_date", "locality", "raw_list_page", "detail_raw_file", "detail_status"}
+        if not required.issubset(candidates.columns):
+            raise ValueError("LAW_COLLECTION_CANDIDATE_SCHEMA_INVALID")
+        if manifest.get("candidate_count") != len(candidates):
+            raise ValueError("LAW_COLLECTION_COUNT_MISMATCH")
+        requests = manifest.get("requests")
+        if not isinstance(requests, list):
+            raise ValueError("LAW_COLLECTION_REQUESTS_INVALID")
+        sources, list_records, details = {}, {}, {}
+        pages_count = rejected_count = 0
+        for request in requests:
+            if not isinstance(request, dict) or not isinstance(request.get("parameters"), dict):
+                raise ValueError("LAW_COLLECTION_REQUESTS_INVALID")
+            params = request["parameters"]
+            if request.get("result") == "detail_rejected":
+                if request.get("raw_file") or request.get("record_count") != 0:
+                    raise ValueError("LAW_COLLECTION_REQUESTS_INVALID")
+                rejected_count += 1
+                continue
+            source = request.get("raw_file")
+            path = _collection_path(root, source)
+            digest = request.get("sha256")
+            if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+                raise ValueError("LAW_COLLECTION_SOURCE_HASH_INVALID")
+            raw = path.read_bytes()
+            if hashlib.sha256(raw).hexdigest() != digest:
+                raise ValueError("LAW_COLLECTION_SOURCE_CHANGED")
+            if source in sources:
+                raise ValueError("LAW_COLLECTION_DUPLICATE_SOURCE")
+            payload = json.loads(raw.decode("utf-8-sig"))
+            sources[source] = request
+            if "query" in params:
+                records = _extract_records(payload)
+                if request.get("record_count") != len(records):
+                    raise ValueError("LAW_COLLECTION_COUNT_MISMATCH")
+                list_records[source] = records
+                pages_count += 1
+            elif params.get("MST") or params.get("ID"):
+                if request.get("record_count") != 1:
+                    raise ValueError("LAW_COLLECTION_COUNT_MISMATCH")
+                details[source] = payload
+            else:
+                raise ValueError("LAW_COLLECTION_REQUESTS_INVALID")
+        accepted = rejected_rows = 0
+        seen_identities, used_details = set(), set()
+        for candidate in candidates.to_dict("records"):
+            serial, law_id = candidate["ordinance_serial"], candidate["ordinance_id"]
+            identity = serial or law_id
+            if not identity or identity in seen_identities:
+                raise ValueError("LAW_COLLECTION_CANDIDATE_IDENTITY_INVALID")
+            seen_identities.add(identity)
+            page = candidate["raw_list_page"]
+            records = list_records.get(page, [])
+            if not any((not serial or _get(record, "serial") == serial)
+                       and (not law_id or _get(record, "id") == law_id)
+                       and _metadata_matches(record, candidate) for record in records):
+                raise ValueError("LAW_COLLECTION_CANDIDATE_SOURCE_UNBOUND")
+            detail = candidate["detail_raw_file"]
+            if detail:
+                if detail not in details or detail in used_details:
+                    raise ValueError("LAW_COLLECTION_DETAIL_SOURCE_UNBOUND")
+                if candidate["detail_status"] != "document_identity_and_body_validated_operational_policy_unverified":
+                    raise ValueError("LAW_COLLECTION_DETAIL_STATUS_INVALID")
+                params = sources[detail]["parameters"]
+                if ((params.get("MST") and str(params["MST"]) != serial)
+                        or (params.get("ID") and str(params["ID"]) != law_id)):
+                    raise ValueError("LAW_COLLECTION_DETAIL_SOURCE_UNBOUND")
+                _validate_detail(details[detail], candidate)
+                used_details.add(detail)
+                accepted += 1
+            elif candidate["detail_status"].startswith("LAW_API_"):
+                rejected_rows += 1
+            elif candidate["detail_status"] != "not_requested":
+                raise ValueError("LAW_COLLECTION_DETAIL_STATUS_INVALID")
+        if (manifest.get("pages_used") != pages_count
+                or manifest.get("detail_count") != accepted
+                or manifest.get("detail_rejected_count", 0) != rejected_count
+                or rejected_count != rejected_rows or len(details) != accepted):
+            raise ValueError("LAW_COLLECTION_COUNT_MISMATCH")
+    except (ValueError, TypeError, KeyError, AttributeError, OSError) as error:
+        code = str(error)
+        if not re.fullmatch(r"LAW_(?:COLLECTION|API)_[A-Z_]+", code):
+            code = "LAW_COLLECTION_EVIDENCE_INVALID"
+        raise ValueError(code) from None
 
 
 def collect_ordinances(*, root=ROOT, keywords=DEFAULT_KEYWORDS, limit_pages=30, detail_budget=0,
@@ -213,10 +366,21 @@ def collect_ordinances(*, root=ROOT, keywords=DEFAULT_KEYWORDS, limit_pages=30, 
         cached_manifest = prior[-1] / "manifest.json"
         candidate_csv = root / "data/processed/regional_2024/policy_ordinance_candidates.csv"
         if cached_manifest.exists() and candidate_csv.exists():
-            cached = json.loads(cached_manifest.read_text(encoding="utf-8"))
-            if (cached.get("status") == "complete_within_page_budget"
+            try:
+                cached = json.loads(cached_manifest.read_text(encoding="utf-8"))
+            except (ValueError, OSError):
+                cached = {}
+            if not isinstance(cached, dict):
+                cached = {}
+            reusable = (cached.get("status") == "complete_within_page_budget"
                     and cached.get("request_scope") == request_scope
-                    and cached.get("candidate_sha256") == hashlib.sha256(candidate_csv.read_bytes()).hexdigest()):
+                    and cached.get("candidate_sha256") == hashlib.sha256(candidate_csv.read_bytes()).hexdigest())
+            if reusable:
+                try:
+                    validate_collection_evidence(root, cached, candidate_csv=candidate_csv)
+                except ValueError:
+                    reusable = False
+            if reusable:
                 return cached
     run_id = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y%m%dT%H%M%S_%f")
     run_dir = source_root / run_id

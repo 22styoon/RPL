@@ -9,6 +9,7 @@ from src.model import ROOT
 from src.analysis.pipeline import TITLE
 from src.regional_data.audit_evidence import assess_boundary_audit
 from src.regional_data.audit_reporting import current_audit_fields
+from src.regional_data.ordinance_evidence import current_ordinance_fields
 
 MENU=["국내 통계 현황","재활용 지표 연구","지역·재질별 비교","시도 표준화 분석","해외 통계 비교","시설 및 비용 분석","가구 시간 분석","선행연구","자료 출처·품질","가정 기반 민감도 분석"]
 REPORT=ROOT/"outputs/reports/statistical_analysis"
@@ -145,6 +146,82 @@ def regional_boundary_caption(summary, *, county_report=False):
     return prefix+note+" GIS 경계 도형과 정책 적용권역은 별도 검증 대상이며 지도·정책효과 추론의 근거로 사용하지 않습니다."
 
 
+def live_ordinance_view(cached_summary):
+    """Fresh legal-source linkage controls current counts and downloads."""
+    summary=dict(cached_summary)
+    summary.update(current_ordinance_fields(ROOT,cached_summary=cached_summary))
+    law_counts=("law_ordinance_version_candidates","law_ordinance_detail_json_count",
+                "law_article_evidence_rows","law_verified_document_version_rows")
+    summary["cached_law_report_stale"]=(
+        any(cached_summary.get(key,0)!=summary.get(key,0) for key in law_counts)
+        or (bool(cached_summary.get("law_ordinance_version_candidates",0))
+            and not summary.get("law_linkage_verified",False)))
+    summary["cached_report_stale"]=bool(summary.get("cached_report_stale")) or summary["cached_law_report_stale"]
+    return summary
+
+
+def filter_ordinance_articles(frame, query):
+    """Literal search of legal titles, localities and cited article text."""
+    query=str(query or "").strip().casefold()
+    if not query or frame.empty:return frame.copy()
+    fields=[name for name in ("policy_name","locality","article_number","article_title",
+                              "article_text","materials_mentioned","topics_mentioned") if name in frame]
+    if not fields:return frame.iloc[0:0].copy()
+    text=frame[fields].fillna("").astype(str).agg(" ".join,axis=1).str.casefold()
+    return frame.loc[text.str.contains(query,regex=False)].copy()
+
+
+def render_ordinance_evidence(summary):
+    st.subheader("법령정보와 조문 근거")
+    st.caption("2024년 시행일을 가진 연혁 버전의 제목 검색 결과입니다(nw=2, efYd=2024년). 2024년에 유효했던 모든 조례나 연중 적용기간을 확인한 목록은 아닙니다.")
+    if not summary.get("law_linkage_verified",False):
+        if summary.get("cached_law_report_stale"):
+            st.warning("저장된 법령 연결의 입력·원문 근거를 현재 자료와 대조해 확인하지 못했습니다. 과거 건수를 현재 검증 결과로 표시하지 않으며 교차표·조문 다운로드를 보류합니다.")
+        else:
+            st.info("현재 입력과 원문에 연결된 법령 검토표가 아직 없습니다.")
+        if summary.get("law_linkage_reasons"):
+            st.caption("법령 연결 확인: "+"; ".join(str(reason) for reason in summary["law_linkage_reasons"]))
+        st.code(r".\.venv\Scripts\python scripts/link_law_ordinances.py",language="powershell")
+        return
+    st.caption(
+        f'연혁 후보 {summary.get("law_ordinance_version_candidates",0)}버전 · '
+        f'통계단위 코드 일치 {summary.get("law_ordinance_matched_statistical_unit_rows",0)}행 · '
+        f'본문 수집 {summary.get("law_ordinance_detail_json_count",0)}건 · '
+        f'버전 메타데이터 대조 {summary.get("law_verified_document_version_rows",0)}건 · '
+        f'조문 근거 {summary.get("law_article_evidence_rows",0)}행입니다.'
+    )
+    st.caption("조문에 재질·수거방식이 언급된 사실은 검토 단서입니다. 실제 사업 시행·대상범위·처리실적·정책효과와 구분합니다.")
+    crosswalk_path=ROOT/"data/processed/regional_2024/policy_ordinance_geography_crosswalk.csv"
+    if crosswalk_path.exists():
+        with st.expander("법령 후보와 2024 행정코드 교차표"):
+            legal=pd.read_csv(crosswalk_path,dtype=str).fillna("")
+            columns=[name for name in ("policy_name","locality","effective_date","ordinance_serial",
+                     "geography_match_status","matched_sigungu_code_2024","detail_status",
+                     "legal_version_status","source_url") if name in legal]
+            st.dataframe(legal[columns],hide_index=True,
+                         column_config={"source_url":st.column_config.LinkColumn("공식 원문",display_text="원문")})
+            st.download_button("자치법규 코드 교차표 CSV",crosswalk_path.read_bytes(),crosswalk_path.name,"text/csv",key="law_ordinance_crosswalk_download")
+    article_path=ROOT/"data/processed/regional_2024/policy_ordinance_article_evidence.csv"
+    if article_path.exists():
+        articles=pd.read_csv(article_path,dtype=str).fillna("")
+        with st.expander("법령·기관·조문 검색과 원문 근거",expanded=True):
+            query=st.text_input("법령·기관·조문 검색",key="law_ordinance_article_query")
+            selected=filter_ordinance_articles(articles,query)
+            st.caption(f'검색 결과 {len(selected)}행 / 조문 근거 {len(articles)}행')
+            labels={"policy_name":"법령명","locality":"기관","effective_date":"시행일",
+                    "ordinance_serial":"버전 일련번호","article_number":"조문번호","article_title":"조제목",
+                    "text_field":"본문 구분","article_text":"조문 내용","materials_mentioned":"재질 언급",
+                    "topics_mentioned":"주제 언급","source_url":"공식 원문","source_locator":"원문 위치",
+                    "json_pointer":"조문 위치","raw_detail_sha256":"원문 SHA-256",
+                    "legal_version_status":"버전 대조 상태","geography_match_status":"지역 대조 상태"}
+            columns=[name for name in labels if name in selected]
+            st.dataframe(selected[columns].rename(columns=labels),hide_index=True,
+                         column_config={"공식 원문":st.column_config.LinkColumn("공식 원문",display_text="원문")})
+            st.download_button("검색한 조문 근거 CSV",selected.to_csv(index=False).encode("utf-8-sig"),
+                               "ordinance_article_evidence_filtered.csv","text/csv",key="law_ordinance_articles_download")
+            st.caption("원문 위치·조문 위치와 원문 해시는 수집한 버전으로 돌아가 대조하기 위한 정보입니다. 법령의 유효 종료일·개정 전후 적용관계는 별도 확인합니다.")
+
+
 def render_regional_indicator():
     directory=OUTPUT/"reports/regional_indicator"
     path=directory/"manifest.json"
@@ -157,7 +234,7 @@ def render_regional_indicator():
         return
     meta=json.loads(path.read_text(encoding="utf-8"))
     current_audit=assess_boundary_audit(ROOT)
-    summary=live_regional_audit_view(meta["summary"],assessment=current_audit)
+    summary=live_ordinance_view(live_regional_audit_view(meta["summary"],assessment=current_audit))
     st.subheader("2024년 시도별 재질 구성 표준화")
     st.markdown("지역별 4재질 발생량 비중을 전국 실측 발생량 비중으로 고정해 비교합니다. 정책효과나 최종 재생원료 생산률을 나타내지 않습니다.")
     columns=st.columns(4)
@@ -166,7 +243,7 @@ def render_regional_indicator():
     columns[2].metric("검증된 정책",f'{summary["policy_verified_rows"]}건')
     columns[3].metric("정책·실적 검증 결합",f'{summary["verified_join_rows"]}행' if summary["policy_join_boundary_input_verified"] else "재검증 전")
     if summary["cached_report_stale"]:
-        st.warning("저장된 보고서의 감사·정책 결합 근거를 현재 입력과 연결해 확인하지 못했습니다. 아래 그림과 다운로드는 과거 생성 결과입니다.")
+        st.warning("저장된 보고서의 감사·법령 연결·정책 결합 정보가 현재 입력과 일치하는지 다시 확인해야 합니다. 아래 그림과 다운로드는 과거 생성 결과입니다.")
     if not summary["policy_join_boundary_input_verified"]:
         prefix="지리 감사는 현재 유효하지만 저장된 정책·성과 결합의 입력 연결을 다시 확인해야 합니다. " if summary["boundary_input_binding_verified"] else "현재 정책·성과 결합은 지리 근거 재검증 전 상태입니다. "
         st.info(prefix+f'저장 보고서의 {summary["cached_verified_join_rows"]}행을 현재 검증된 결합으로 표시하지 않습니다. 정책 원문 자체의 검증 건수는 별도로 유지합니다.')
@@ -197,32 +274,16 @@ def render_regional_indicator():
                 st.download_button(name+" CSV",csv_path.read_bytes(),csv_path.name,"text/csv",key="regional_download_"+name)
         st.warning("R은 재질 구성과 재질별 처리비율의 산술 결합입니다. 회귀 p값은 지표 타당성이나 정책효과를 증명하지 않습니다.")
     st.info(regional_boundary_caption(summary))
-    ordinance_versions=summary.get("law_ordinance_version_candidates",0)
-    if ordinance_versions:
-        st.caption(
-            f'법제처 자치법규 연혁 후보 {ordinance_versions}버전(고유 ID {summary.get("law_ordinance_unique_ids",0)}개) 중 '
-            f'2024년 통계단위 코드 일치 {summary.get("law_ordinance_matched_statistical_unit_rows",0)}행, '
-            f'시도 단위 {summary.get("law_ordinance_sido_only_rows",0)}행, 미매칭 {summary.get("law_ordinance_unmatched_rows",0)}행입니다. '
-            f'본문 {summary.get("law_ordinance_detail_json_count",0)}건을 받았으며, 실제 운영정책 증거와 구분합니다.'
-        )
-        crosswalk_path=ROOT/"data/processed/regional_2024/policy_ordinance_geography_crosswalk.csv"
-        if crosswalk_path.exists():
-            with st.expander("자치법규 후보와 2024 행정코드 교차표"):
-                legal=pd.read_csv(crosswalk_path,dtype=str).fillna("")
-                columns=["policy_name","locality","effective_date","geography_match_status","matched_sigungu_code_2024","candidate_status"]
-                columns=[column for column in columns if column in legal]
-                st.dataframe(legal[columns],hide_index=True)
-                st.download_button("자치법규 코드 교차표 CSV",crosswalk_path.read_bytes(),crosswalk_path.name,"text/csv",key="law_ordinance_crosswalk_download")
-                st.caption("코드 연결은 후보 탐색용입니다. 법령만으로 2024년 실제 시행·대상범위·성과를 확인하지 않았습니다.")
+    render_ordinance_evidence(summary)
     sigungu_report=OUTPUT/"reports/regional_indicator_sigungu"
     sigungu_manifest=sigungu_report/"manifest.json"
     if sigungu_manifest.exists():
         county=json.loads(sigungu_manifest.read_text(encoding="utf-8"))
-        county_summary=live_regional_audit_view(county["summary"],assessment=current_audit)
+        county_summary=live_ordinance_view(live_regional_audit_view(county["summary"],assessment=current_audit))
         st.divider();st.subheader("시군구 보조 기술 비교")
         st.caption(regional_boundary_caption(county_summary,county_report=True))
         if county_summary["cached_report_stale"]:
-            st.warning("시군구 보고서도 과거 감사 상태를 포함한 저장 결과입니다. 현재 입력 감사와 보고서 재생성이 필요합니다.")
+            st.warning("시군구 보고서도 과거 입력·증빙 상태를 포함한 저장 결과입니다. 현재 자료 확인과 보고서 재생성이 필요합니다.")
         st.metric("시군구 관측",f'{county_summary["sigungu_count"]}개 · {county_summary["material_rows"]} 재질행')
         for key,title,table_name in (("county_scatter","시군구 R과 S","scores"),("county_distribution","분포 비교","scores"),("county_extremes","표준화 상·하위","scores")):
             figure=artifact_path(f"figures/regional_indicator_sigungu/{key}.json")

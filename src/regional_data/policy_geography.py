@@ -11,16 +11,56 @@ GEOGRAPHY_FIELDS = (
 )
 
 
+def _validate_reference_period(frame, label):
+    """Absent period metadata is legacy-compatible; contradictory metadata is not."""
+    for field, expected in (("code_reference_month", "202412"),
+                            ("reference_month", "202412"), ("reference_year", "2024")):
+        if field in frame and not frame[field].astype(str).str.strip().eq(expected).all():
+            raise ValueError(f"{label}: {field} must identify {expected} throughout.")
+
+
+def _normalize_identities(frame, label):
+    normalized = frame.copy()
+    fields = [field for field in ("sido_name", "sido_code", "sigungu_name", "sigungu_code")
+              if field in normalized]
+    for field in fields:
+        if normalized[field].isna().any():
+            raise ValueError(f"{label}: {field} contains a missing geographic identity.")
+        normalized[field] = normalized[field].astype(str).str.strip()
+        if normalized[field].eq("").any():
+            raise ValueError(f"{label}: {field} contains a missing geographic identity.")
+    identities = normalized[fields].drop_duplicates()
+    if {"sido_name", "sido_code"}.issubset(fields):
+        for source, target in (("sido_name", "sido_code"), ("sido_code", "sido_name")):
+            if identities.groupby(source)[target].nunique().gt(1).any():
+                raise ValueError(f"{label}: ambiguous province name/code mapping.")
+    if "sigungu_code" in fields:
+        for field in fields:
+            if field != "sigungu_code" and identities.groupby("sigungu_code")[field].nunique().gt(1).any():
+                raise ValueError(f"{label}: conflicting identity for the same sigungu code.")
+    return normalized
+
+
+def _validate_shared_identity(codes, waste_units):
+    common = [field for field in ("sido_name", "sido_code", "sigungu_name")
+              if field in waste_units]
+    if not common:
+        return
+    matched = codes[["sigungu_code", *common]].drop_duplicates().merge(
+        waste_units[["sigungu_code", *common]].drop_duplicates(), on="sigungu_code",
+        suffixes=("_code", "_waste"))
+    if any(matched[field + "_code"].ne(matched[field + "_waste"]).any() for field in common):
+        raise ValueError("MOIS and waste inputs disagree on a shared sigungu code's identity.")
+
+
 def _sido_lookup(codes):
-    rows = codes.dropna(subset=["sido_name", "sido_code"])
-    lookup = {}
-    for row in rows.to_dict("records"):
-        lookup[str(row["sido_name"]).strip()] = str(row["sido_code"]).strip()
-    return lookup
+    # _normalize_identities rejects contradictory province mappings first.
+    pairs = codes[["sido_name", "sido_code"]].drop_duplicates()
+    return dict(pairs.itertuples(index=False, name=None))
 
 
 def _resolve_locality(value, codes, waste_codes, sido_codes):
-    locality = " ".join(str(value or "").split())
+    locality = "" if pd.isna(value) else " ".join(str(value).split())
     if not locality:
         return {"matched_sido_name_2024": "", "matched_sido_code_2024": "",
                 "matched_sigungu_name_2024": "", "matched_sigungu_code_2024": "",
@@ -81,6 +121,16 @@ def link_ordinance_geography(candidates, codes, waste_units):
     code_required = {"sido_name", "sigungu_name", "sido_code", "sigungu_code"}
     if not code_required.issubset(codes.columns):
         raise ValueError("MOIS 코드 CSV 필수 열이 없습니다.")
+    if "sigungu_code" not in waste_units:
+        raise ValueError("폐기물 통계단위 CSV 필수 열이 없습니다.")
+    for frame, label in ((codes, "MOIS"), (waste_units, "waste")):
+        _validate_reference_period(frame, label)
+    codes = _normalize_identities(codes, "MOIS")
+    waste_units = _normalize_identities(waste_units, "waste")
+    _validate_shared_identity(codes, waste_units)
+    # Repeated identical records are the same logical unit. Different codes
+    # sharing a locality label remain ambiguous in _resolve_locality.
+    codes = codes.drop_duplicates(subset=sorted(code_required))
     waste_codes = set(waste_units.sigungu_code.dropna().astype(str))
     sido_codes = _sido_lookup(codes)
     linked = candidates.copy()

@@ -33,20 +33,24 @@ LAW_API_DOMAIN=http://localhost
 .\.venv\Scripts\python scripts/collect_law_ordinances.py --dry-run
 ```
 
-설정이 끝나면 2024년에 시행된 자치법규 연혁을 검색합니다. 기본 검색어는 재활용·분리수거·폐기물·자원순환·생활폐기물·재활용가능자원이며, 목록 페이지 요청 예산은 전체 30회입니다. 본문은 호출량을 제한하기 위해 기본 수집하지 않습니다.
+설정이 끝나면 시행일이 2024년인 자치법규 연혁 버전을 검색합니다. 2024년에 유효했던 모든 법규나 정책 노출기간을 포괄하는 검색은 아닙니다. 기본 검색어는 재활용·분리수거·폐기물·자원순환·생활폐기물·재활용가능자원이며, 목록 페이지 요청 예산은 전체 30회입니다. 본문은 호출량을 제한하기 위해 기본 수집하지 않습니다.
 
 ```powershell
 .\.venv\Scripts\python scripts/collect_law_ordinances.py --limit-pages 30
 .\.venv\Scripts\python scripts/collect_law_ordinances.py --keyword 재활용 --keyword 분리수거 --details 20
+.\.venv\Scripts\python scripts/collect_law_ordinances.py --limit-pages 30 --details 60
 ```
 
 OC가 들어간 상세링크는 로컬 저장 전에 인증 파라미터를 제거합니다. 이 정제 JSON·해시·요청조건·수집시각은 `data/raw/regional_2024/law_ordinances/`에, 검색결과는 `data/processed/regional_2024/policy_ordinance_candidates.csv`에 저장합니다. OC 값은 로그·manifest·저장파일에 포함하지 않습니다.
 
-2024년 후보 기관명을 2024년 12월 MOIS 코드목록과 대조하려면 다음을 실행합니다. 정확히 연결되는 기관명만 교차표에 기록하며, 운영정책 검증이나 성과 결합은 하지 않습니다.
+2024년 후보 기관명을 2024년 12월 MOIS 코드목록과 대조하려면 다음을 실행합니다. 정확히 연결되는 기관명을 교차표에 기록하고, 검증한 본문 텍스트의 조문 위치·원문 해시·공개 열람 링크를 별도 CSV에 연결합니다. 운영정책 검증이나 성과 결합은 하지 않습니다.
 
 ```powershell
 .\.venv\Scripts\python scripts/link_law_ordinances.py
+.\.venv\Scripts\python scripts/link_law_ordinances.py --check-only
 ```
+
+`--check-only`는 네트워크 요청·파일 수정 없이 현재 원문과 입력의 연결을 확인합니다. 원문·후보·코드·조문 CSV가 바뀌면 다시 수집·연결해야 합니다. 법규명·기관·조문 검색과 다운로드는 지역 연구 메뉴에 있으며, [실자료 연결 결과와 해석 범위](regional_ordinance_candidate_review_2026-11-19.md)를 함께 확인합니다.
 
 ## 해석 경계
 
