@@ -1,0 +1,40 @@
+reference_year: 2024
+policies:
+  - policy_id: disposable_cup_deposit_pilot
+    geography_id: jeju_sejong_pilot_areas
+    population_id: deposit_cup_transactions
+    material_id: disposable_deposit_cups
+    channel_id: deposit_return_system
+    period_start: '2022-12-02'
+    period_end: '2024-11-30'
+    period_type: cumulative
+    policy_name: 일회용컵 보증금제
+    geography: 제주·세종 선도지역 합계
+    coverage: 보증금제 적용 매장의 보증금 대상 일회용컵 거래
+    material: 제도 대상 일회용컵(종이컵·플라스틱컵)
+    collection_channel: 제도 적용 매장과 매장 외 지정 반납처
+    operating_entity: 환경부·자원순환보증금관리센터(COSMO)
+    operation_source_url: https://eng.cosmo.or.kr/menu.es?mid=a10202000000
+    operation_source_locator: 제도안내의 시행일·선도지역·제도참여와 운영체계의 반환 경로
+    reviewed_on: '2026-11-22'
+    household_join_exclusions:
+      geography_mismatch: 제주·세종 선도지역 합계는 개별 시군구 집계가 아니다.
+      population_and_material_mismatch: 보증금 거래의 일회용컵은 시군구 전체 생활(가정)폐기물과 원표의 재질 구분을 대표하지 않는다.
+      period_mismatch: 2022년 12월부터 누적된 값이므로 2024년 1~12월 실적과 기간이 다르다.
+      measurement_stage_mismatch: 판매와 반환을 센 수량은 발생량과 물질재활용 처리량을 잰 무게와 다르다.
+
+performance:
+  - policy_id: disposable_cup_deposit_pilot
+    geography_id: jeju_sejong_pilot_areas
+    population_id: deposit_cup_transactions
+    material_id: disposable_deposit_cups
+    channel_id: deposit_return_system
+    period_start: '2022-12-02'
+    period_end: '2024-11-30'
+    period_type: cumulative
+    cups_sold: 20110000
+    cups_returned: 10040000
+    cup_count_reported_unit: 10000
+    cup_return_rate_percent: 49.9
+    performance_source_url: https://www.evaluation.go.kr/upload2/atch/eval/20250429100704260.pdf
+    performance_source_locator: 환경부 2024년도 자체평가 결과보고서 268쪽 VII-1-② 컵 반환 및 재활용 항목의 기준일

@@ -9,6 +9,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 from src.model import ROOT
+from src.regional_data.followup_reporting import followup_report
 from .standardization import compute_standardization
 from src.regional_data.audit_reporting import current_audit_fields,audit_note
 from src.regional_data.ordinance_evidence import current_ordinance_fields
@@ -121,6 +122,7 @@ def run(root=ROOT,output_root=None):
     summary={"reference_year":2024,"sigungu_count":len(scores),"material_rows":len(counties),"policy_verified_rows":metadata.get("policy_verified_rows",0),"verified_join_rows":metadata.get("verified_join_rows",0),"code_snapshot":metadata.get("metadata_code_snapshot","unknown"),"administrative_boundary_audit_status":metadata.get("administrative_boundary_audit_status","not_audited"),"administrative_boundary_audit_geometry_assessed":metadata.get("administrative_boundary_audit_geometry_assessed",False),"max_abs_shift_area":maxrow["시군구"],"max_abs_shift_pp":float(maxrow["구성 차이 R-S(%p)"].__abs__()),"source_files":source_hashes}
     summary.update(current_audit_fields(root,metadata,waste_frame=counties))
     summary.update(current_ordinance_fields(root))
+    followup_md, followup_html = followup_report(root, tables, summary, files)
     if summary["law_linkage_verified"]:
         law_articles=root/"data/processed/regional_2024/policy_ordinance_article_evidence.csv"
         files["ordinance_article_evidence"]=pd.read_csv(law_articles,dtype=str).fillna("")
@@ -150,11 +152,12 @@ def run(root=ROOT,output_root=None):
     note=(f"공식 2024 원표의 지역명으로 {len(scores)}개 시군구·4재질 관측값을 비교했습니다. 처리행 {len(counties)}개. {boundary_note} 법제처 조례 연혁 후보 {summary['law_ordinance_version_candidates']}버전 중 {summary['law_ordinance_matched_statistical_unit_rows']}행이 통계단위 코드와 일치했고, 본문 {summary['law_ordinance_detail_json_count']}건을 받았습니다. "
           f"법령 연결 상태 {summary['law_linkage_status']}, 버전 메타데이터 대조 {summary['law_verified_document_version_rows']}건, 조문 근거 {summary['law_article_evidence_rows']}행입니다. "
           "2024년 시행일을 가진 연혁 버전의 제목 검색 결과이며, 2024년에 유효했던 전체 조례나 연중 적용기간을 확인한 목록은 아닙니다. "
-          f"실제 정책-성과 검증 결합은 {summary['verified_join_rows']}행입니다.")
+          f"시군구 연간 생활폐기물 처리량과 정책의 검증 결합은 {summary['verified_join_rows']}행입니다.")
     md=[f"# {TITLE}",f"\n생성: {generated}\n","## 해석범위\n",note,"\n같은 전국 기준 재질 가중치로 각 시군구의 4재질별 실측 처리비율을 다시 계산한 **기술 비교**입니다. 지도화·정책노출 연결·시군구 회귀는 하지 않습니다.\n","## 요약\n",f"지역 수 {len(scores)} · 재질별 처리행 {len(counties)} · 최대 |R-S|: {maxrow['시군구']} {summary['max_abs_shift_pp']:.2f}%p.\n","## 시군구 전체 결과\n",_md_table(scores),"\n## 가중치 민감도 요약\n",_md_table(sens_summary),"\n## 제한\n","- 전국 기준비중은 KOSIS 2024 전국 4재질 발생량입니다. 분자는 물질재활용 처리량이며 최종 재생원료 수율이 아닙니다.\n- 행정코드·명칭 목록 감사는 GIS 경계 도형 또는 지역 간 반입·반출을 확인하지 않습니다. 행정명은 원표 기준입니다.\n- 시군구별 결과는 기술 통계입니다. 정책 자료가 없어 인과추론·정책 랭킹·회귀를 하지 않습니다.\n- 모든 지역에 같은 전국 가중치를 적용했습니다. 가중치 민감도 CSV에서 지역 평균·균등·해당 시군구 제외 전국 비중을 비교할 수 있습니다.\n","## 재현\n",f"`{manifest['reproduction_command']}`\n"]
     md.extend(["\n## 시군구 분포 요약\n",_md_table(descriptive_summary)])
     if summary["law_linkage_verified"]:
         md.extend(["\n## 법령 조문 근거\n","[조문 근거 CSV](../../tables/regional_indicator_sigungu/ordinance_article_evidence.csv)는 법령명·버전 일련번호·조문 위치·공식 원문 링크·원문 해시를 보존합니다. 재질·수거방식의 언급은 검토 단서이며 운영정책의 시행 증거가 아닙니다.\n"])
+    md.extend(followup_md)
     (report/"report.md").write_text("\n".join(md)+"\n",encoding="utf-8")
     body=f'<header><h1>{TITLE}</h1><p>{html.escape(note)}</p><p><a href="report.md">Markdown 보고서</a></p></header><main>'+"".join(sections)+f'<section><h2>가중치 민감도 요약</h2>{sens_summary.to_html(index=False,float_format=lambda x:f"{x:.3f}")}<h2>상세 지표 전체</h2><p><a href="../../tables/regional_indicator_sigungu/scores.csv">scores.csv</a> · <a href="../../tables/regional_indicator_sigungu/contributions.csv">contributions.csv</a> · <a href="../../tables/regional_indicator_sigungu/weight_sensitivity.csv">weight_sensitivity.csv</a></p><p>재현: <code>{manifest["reproduction_command"]}</code></p></section></main>'
     summary_html=descriptive_summary.to_html(index=False,float_format=lambda x:f"{x:.3f}")
@@ -162,7 +165,7 @@ def run(root=ROOT,output_root=None):
     if summary["law_linkage_verified"]:
         body=body.replace("</main>",'<section><h2>법령 조문 근거</h2><p><a href="../../tables/regional_indicator_sigungu/ordinance_article_evidence.csv">조문 근거 CSV</a>에서 법령 버전·조문 위치·공식 원문·해시를 확인할 수 있습니다. 조문 언급을 실제 운영정책의 증거로 환산하지 않습니다.</p></section></main>')
     page='<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+TITLE+'</title><style>body{margin:0;background:#f3f6f5;color:#172e35;font:16px/1.65 "Malgun Gothic",sans-serif}header,main{max-width:1200px;margin:auto;padding:28px}section{background:#fff;border:1px solid #dbe5e4;border-radius:12px;margin:22px 0;padding:24px;overflow:auto}a{color:#126c78}</style>'+body+'</html>'
-    (report/"index.html").write_text(page,encoding="utf-8")
+    (report/"index.html").write_text(page.replace("</main>", followup_html + "</main>"),encoding="utf-8")
     manifest["artifacts"]={str(path.relative_to(output)).replace("\\","/"):{"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"bytes":path.stat().st_size} for base in (tables,figures,report) for path in sorted(base.iterdir()) if path.is_file() and path.name!="manifest.json"}
     (report/"manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2,allow_nan=False)+"\n",encoding="utf-8")
     return manifest

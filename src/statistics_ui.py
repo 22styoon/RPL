@@ -9,6 +9,9 @@ from src.model import ROOT
 from src.analysis.pipeline import TITLE
 from src.regional_data.audit_evidence import assess_boundary_audit
 from src.regional_data.audit_reporting import current_audit_fields
+from src.regional_data.followup_reporting import (
+    POLICY_SCOPE, TITLE as OPERATING_POLICY_TITLE, gis_note, program_display, program_evidence,
+)
 from src.regional_data.ordinance_evidence import current_ordinance_fields
 
 MENU=["국내 통계 현황","재활용 지표 연구","지역·재질별 비교","시도 표준화 분석","해외 통계 비교","시설 및 비용 분석","가구 시간 분석","선행연구","자료 출처·품질","가정 기반 민감도 분석"]
@@ -240,8 +243,8 @@ def render_regional_indicator():
     columns=st.columns(4)
     columns[0].metric("시도 관측",f'{summary["sido_rows"]}개')
     columns[1].metric("시군구 자료 연결",f'{summary["sigungu_verified_rows"]}행')
-    columns[2].metric("검증된 정책",f'{summary["policy_verified_rows"]}건')
-    columns[3].metric("정책·실적 검증 결합",f'{summary["verified_join_rows"]}행' if summary["policy_join_boundary_input_verified"] else "재검증 전")
+    columns[2].metric("생활폐기물 결합용 정책",f'{summary["policy_verified_rows"]}건')
+    columns[3].metric("연간 생활폐기물 결합",f'{summary["verified_join_rows"]}행' if summary["policy_join_boundary_input_verified"] else "재검증 전")
     if summary["cached_report_stale"]:
         st.warning("저장된 보고서의 감사·법령 연결·정책 결합 정보가 현재 입력과 일치하는지 다시 확인해야 합니다. 아래 그림과 다운로드는 과거 생성 결과입니다.")
     if not summary["policy_join_boundary_input_verified"]:
@@ -274,6 +277,25 @@ def render_regional_indicator():
                 st.download_button(name+" CSV",csv_path.read_bytes(),csv_path.name,"text/csv",key="regional_download_"+name)
         st.warning("R은 재질 구성과 재질별 처리비율의 산술 결합입니다. 회귀 p값은 지표 타당성이나 정책효과를 증명하지 않습니다.")
     st.info(regional_boundary_caption(summary))
+    if "gis_boundary_status" in summary:
+        gis = {
+            "status": summary["gis_boundary_status"],
+            "verified": summary["gis_boundary_verified"],
+            "summary": summary["gis_boundary_summary"],
+            "reasons": summary["gis_boundary_reasons"],
+        }
+        st.caption("보고서 생성 시 GIS 감사 · " + gis_note(gis))
+    evidence = program_evidence(ROOT)
+    if evidence is not None:
+        st.subheader(OPERATING_POLICY_TITLE)
+        st.caption(POLICY_SCOPE)
+        st.dataframe(program_display(evidence), hide_index=True)
+        st.download_button(
+            "사업 자체 성과와 원문 출처 CSV",
+            evidence.performance.to_csv(index=False).encode("utf-8-sig"),
+            "operating_policy_performance.csv",
+            "text/csv",
+        )
     render_ordinance_evidence(summary)
     sigungu_report=OUTPUT/"reports/regional_indicator_sigungu"
     sigungu_manifest=sigungu_report/"manifest.json"
