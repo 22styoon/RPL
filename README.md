@@ -1,5 +1,17 @@
 # RPL | 분리배출 정책 통계분석 및 시각화
 
+**진행 현황 확인: 2026-11-22 (Asia/Seoul).** 지표 연구·지역 감사·법령 연결 구현은 [PR #5](https://github.com/22styoon/RPL/pull/5)에 반영되어 있습니다. 현재 저장 증빙과 입력을 다시 대조한 결과 월별 코드·명칭 감사와 법령 연결 모두 유효했습니다. 이번 확인은 외부 API를 새로 수집한 결과가 아닙니다.
+
+| 작업 | 현재 확보·구현 상태 |
+|---|---|
+| 국제 비교 지표 연구 | 근거 25항목·그림 12개, H/S 산식과 공통 가중치 민감도 |
+| 지역 실자료 | 229개 시군구·4재질 916행, 2024년 12개월 코드·명칭 감사 |
+| 법령정보 연결 | 연혁 후보 659버전 중 523버전 지역 코드 일치, 본문 60건·텍스트 1,031항목 검색·원문 연결 |
+| 검증 | 마지막 전체 테스트: 2026-11-20, 683개 통과·건너뜀 0개. 2026-11-22에는 현재 입력·증빙 연결을 재확인 |
+| 추가 근거가 필요한 분석 | 최종 재생원료 산출률의 국가 비교, 실제 정책 시행·노출과 인과효과. 검증된 정책·성과 결합은 0행 |
+
+[통합·진행 기록](docs/pr5_integration_review_2026-11-19.md) · [법령 연결 결과](docs/regional_ordinance_candidate_review_2026-11-19.md)
+
 ## 재활용률의 국제 비교 지표 연구
 
 **국가마다 다른 재활용률의 계산 기준을 맞춘 뒤 비교한다.** [전체 연구 보고서](docs/recycling_indicator_study.md)는 선행연구와 공식 기준 22항목을 검토하고, 같은 폐기물 범위·발생국·발생연도의 최종 재생물질 회수율 H와 공통 재질 구성의 표준화 지표 S를 제안합니다. 산식의 정당성·인과 해석·검증 설계를 함께 설명합니다. [근거 원장](data/indicator_sources.json) · [입력 계약](docs/indicator_data_contract.md)
@@ -60,7 +72,7 @@ python -m venv .venv
 ```powershell
 .\.venv\Scripts\python scripts/collect_regional_recycling.py --source kr_waste_2024_detail --year 2024 --dry-run
 .\.venv\Scripts\python scripts/collect_regional_recycling.py --source kr_admin_codes_2024 --year 2024 --dry-run
-.\.venv\Scripts\python scripts/collect_law_ordinances.py --limit-pages 30 --details 20
+.\.venv\Scripts\python scripts/collect_law_ordinances.py --limit-pages 30 --details 60
 .\.venv\Scripts\python scripts/link_law_ordinances.py
 .\.venv\Scripts\python scripts/join_regional_policy.py --year 2024
 ```
