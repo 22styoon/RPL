@@ -32,6 +32,26 @@ def load_mois_key(root=ROOT):
         raise ValueError("MOIS_API_KEY 미설정")
     return unquote(value)
 
+def load_law_oc(root=ROOT):
+    value=os.environ.get("LAW_OC","").strip()
+    if not value:
+        for line in (Path(root)/".env").read_text(encoding="utf-8-sig").splitlines() if (Path(root)/".env").exists() else []:
+            name,sep,entry=line.partition("=")
+            if sep and name.strip()=="LAW_OC":
+                value=entry.strip().strip('"').strip("'");break
+    if not value:
+        raise ValueError("LAW_OC 미설정")
+    return value
+
+def load_law_domain(root=ROOT):
+    value=os.environ.get("LAW_API_DOMAIN","").strip()
+    if not value:
+        for line in (Path(root)/".env").read_text(encoding="utf-8-sig").splitlines() if (Path(root)/".env").exists() else []:
+            name,sep,entry=line.partition("=")
+            if sep and name.strip()=="LAW_API_DOMAIN":
+                value=entry.strip().strip('"').strip("'");break
+    return value.rstrip("/")
+
 def safe_url(url):
     parts=urlsplit(url)
     if parts.scheme!="https" or parts.hostname not in {"kwaste.or.kr","www.kwaste.or.kr","www.law.go.kr","law.go.kr","www.mois.go.kr","www.data.go.kr","apis.data.go.kr","kosis.kr"}:

@@ -12,6 +12,8 @@ import yaml
 from src.model import ROOT
 from .standardization import compute_standardization
 from .regional_inference import run_composition_diagnostics
+from src.regional_data.audit_reporting import current_audit_fields,audit_note
+from src.regional_data.ordinance_evidence import current_ordinance_fields
 
 TITLE = "2024년 시도별 재활용 처리비율: 재질 구성 표준화"
 
@@ -134,11 +136,22 @@ def run(root=ROOT, output_root=None):
         "src/analysis/standardization.py","src/analysis/regional_inference.py","src/analysis/regional_indicator_report.py",
         "src/regional_data/clients.py","src/regional_data/geocodes.py","src/regional_data/parsers.py",
         "src/regional_data/policy_records.py","src/regional_data/prepare.py","src/regional_data/validation.py",
+        "src/regional_data/boundary_audit.py","src/regional_data/law_client.py","src/regional_data/policy_geography.py",
+        "src/regional_data/audit_evidence.py","src/regional_data/audit_reporting.py","src/regional_data/ordinance_evidence.py",
         "scripts/collect_regional_recycling.py","scripts/prepare_regional_recycling.py",
+        "scripts/audit_regional_boundaries.py","scripts/collect_law_ordinances.py","scripts/link_law_ordinances.py",
         "scripts/join_regional_policy.py","scripts/run_regional_indicator.py")]
     input_files=[source,regional,raw_meta_path,root/"data/processed/regional_2024/sido_2024_materials_verified.csv",
                  root/"data/processed/regional_2024/sigungu_2024_materials_verified.csv",
-                 root/"data/processed/regional_2024/admin_codes_202412.csv",*code_files]
+                 root/"data/processed/regional_2024/admin_codes_202412.csv",
+                 root/"data/processed/regional_2024/admin_codes_monthly_2024.csv",
+                 root/"data/raw/regional_2024/kr_admin_codes_2024/checkpoint.json",
+                 root/"data/processed/regional_2024/boundary_audit_manifest.json",
+                 root/"data/processed/regional_2024/policy_ordinance_candidate_summary.json",
+                 root/"data/processed/regional_2024/policy_ordinance_candidates.csv",
+                 root/"data/processed/regional_2024/policy_ordinance_geography_crosswalk.csv",
+                 root/"data/processed/regional_2024/policy_ordinance_article_evidence.csv",
+                 root/"data/raw/regional_2024/law_ordinances/latest.json",*code_files]
     if raw is not None:input_files.append(raw)
     for path in input_files:
         if path.exists():data_manifest[str(path.relative_to(root)).replace("\\","/")]={"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"bytes":path.stat().st_size}
@@ -147,7 +160,19 @@ def run(root=ROOT, output_root=None):
     summary={"reference_year":2024,"sido_rows":len(scores),"sigungu_candidates":regional_data.get("sigungu_candidates",0),
              "sigungu_verified_rows":regional_data.get("sigungu_verified_rows",0),"sigungu_verified_regions":regional_data.get("sigungu_verified_regions",0),
              "policy_candidates":regional_data.get("policy_candidates",0),"policy_verified_rows":regional_data.get("policy_verified_rows",0),
-             "verified_join_rows":regional_data.get("verified_join_rows",0),"inference_status":inference["status"],"source_files":data_manifest}
+             "verified_join_rows":regional_data.get("verified_join_rows",0),"inference_status":inference["status"],
+             "metadata_code_snapshot":regional_data.get("metadata_code_snapshot","unknown"),
+             "administrative_boundary_audit_status":regional_data.get("administrative_boundary_audit_status","not_audited"),
+             "administrative_boundary_audit_geometry_assessed":regional_data.get("administrative_boundary_audit_geometry_assessed",False),
+             "source_files":data_manifest}
+    summary.update(current_audit_fields(root,regional_data))
+    summary.update(current_ordinance_fields(root))
+    if summary["law_linkage_verified"]:
+        law_articles=root/"data/processed/regional_2024/policy_ordinance_article_evidence.csv"
+        files["ordinance_article_evidence"]=pd.read_csv(law_articles,dtype=str).fillna("")
+        files["ordinance_article_evidence"].to_csv(tables/"ordinance_article_evidence.csv",index=False,encoding="utf-8-sig")
+    elif (tables/"ordinance_article_evidence.csv").exists():
+        (tables/"ordinance_article_evidence.csv").unlink()
     manifest={"title":TITLE,"generated_at":generated,"status":"complete","summary":summary,
               "reproduction_command":r".\.venv\Scripts\python scripts/run_regional_indicator.py --year 2024 --level sido",
               "tables":{key:f"tables/regional_indicator/{key}.csv" for key in files},
@@ -165,20 +190,28 @@ def run(root=ROOT, output_root=None):
     if inference["status"]=="computed":
         inference_html=("<h3>OLS 공동검정 및 강건성 참고</h3><p>귀무가설: 폐지·폐합성수지·폐금속 발생 구성비 계수가 모두 0. R은 같은 구성비와 재질별 비율의 산술 결합이므로 이 검정은 기계적 연관을 포함하며 지표 타당성이나 정책효과 증거가 아니다.</p>"+
                         inference["tests"].to_html(index=False,float_format=lambda x:f"{x:.4g}")+"<h3>계수와 불확실성 추정</h3>"+inference["coefficients"].to_html(index=False,float_format=lambda x:f"{x:.4g}")+"<p>이분산 진단: Breusch–Pagan LM p="+f"{inference['bp_lm_p']:.4g}"+"; HC0/HC3는 이분산 검정이 아니라 강건 공분산 추정이다. 표본은 17개 시도 전수 집계이며 일반 표본추출 가정의 p값 해석에는 한계가 있다.</p>")
+    boundary_note=audit_note(summary)
     note=(f"시군구 원문 파싱 후보 {summary['sigungu_candidates']}행, 이름·2024년 말 행정코드 연결 자료 {summary['sigungu_verified_rows']}행 / {summary['sigungu_verified_regions']}개 시군구. "
-          f"2024년 실제 정책 후보 {summary['policy_candidates']}건, 검증 정책 {summary['policy_verified_rows']}건, 검증 결합 {summary['verified_join_rows']}행. 행정코드는 2024년 12월 스냅샷이라 연중 경계변경 감사가 남았고, 정책 자료가 없어 결합결과는 0행이다.")
+          f"법제처 자치법규 연혁 후보 {summary['law_ordinance_version_candidates']}버전(고유 ID {summary['law_ordinance_unique_ids']}개), 2024 통계단위 코드 일치 {summary['law_ordinance_matched_statistical_unit_rows']}행, 본문 수집 {summary['law_ordinance_detail_json_count']}건. "
+          f"법령 연결 상태 {summary['law_linkage_status']}, 버전 메타데이터 대조 {summary['law_verified_document_version_rows']}건, 조문 근거 {summary['law_article_evidence_rows']}행. "
+          "2024년 시행일을 가진 연혁 버전의 제목 검색 결과이며, 2024년에 유효했던 전체 조례나 연중 적용기간을 확인한 목록은 아니다. "
+          f"실제 운영정책 근거검증 {summary['policy_verified_rows']}건, 정책-성과 검증결합 {summary['verified_join_rows']}행. {boundary_note} 조례 후보만으로 운영정책 결합을 하지 않는다.")
     md=[f"# {TITLE}",f"\n생성: {generated}\n","## 질문과 해석 범위\n", "같은 2024년 시도에서 4재질의 실제 발생량 구성을 전국 기준으로 고정했을 때, 관측 물질재활용 처리비율이 어떻게 달라지는가? 이 값은 재질구성 표준화 비교지표이며 최종 재생원료 생산률이나 정책의 인과효과가 아닙니다.\n",
         "## 산식\n", "재질별 관측 처리비율 `p_rm=M_rm/G_rm`, 지역 내 발생비중 `a_rm=G_rm/Σ_m G_rm`, 2024년 전국 발생량 기준비중 `w_m=G_전국,m/Σ_m G_전국,m`을 사용합니다. `R_r=100Σa_rm p_rm`, `S_r=100Σw_m p_rm`, 구성 차이 `R_r-S_r=100Σ(a_rm-w_m)p_rm`입니다. 전국 행은 17개 시도 합계에 더하지 않습니다.\n",
         "## 기준 가중치\n",_md_table(weights_display),"\n## 시도 결과\n",_md_table(scores),"\n## 구성 기여도\n",_md_table(contributions),"\n## 가중치 민감도\n",_md_table(sensitivity_summary),"\n## 보조 회귀와 진단\n"]
     if inference["status"]=="computed":md.extend([inference["interpretation"]+"\n",_md_table(inference["tests"]),"\n계수·HC3 신뢰구간, VIF, 레버리지/Cook 거리, 시도별 제외 결과는 같은 폴더의 CSV에 저장했습니다. Breusch–Pagan은 별도 이분산 진단입니다.\n"])
     else:md.append(f"회귀 보류: {inference.get('reason')}\n")
     md.extend(["\n## 지역별 가중치 안정성\n",f"불안정 기준은 점수 범위 {thresholds.get('score_span_pp',5.0)}%p 초과 또는 순위 범위 {thresholds.get('rank_span',3)} 초과입니다. 이는 가중치 민감성 경고선이며 통계적 유의성 기준이 아닙니다.\n",_md_table(stability),"\n## 시군구·정책 자료 상태\n",note,"\n## 재현\n",f"`{manifest['reproduction_command']}`","\n출처: [KOSIS 2024 생활폐기물 통계](https://kosis.kr/statHtml/statHtml.do?orgId=106&tblId=DT_106N_29_2020005), [한국폐기물협회 2024 전국 통계 원문](https://kwaste.or.kr/data/01.php).\n","## 한계\n","- 대응 4품목만 포함하며 복합·영농폐기물 등은 제외했습니다. 처리비율 분자는 물질재활용 처리량이고 최종 재생원료 생산량이 아닙니다.\n- 표준화는 관측 처리비율의 구성만 고정합니다. 지역 간 시설·반입·반출·집계경계·정책 차이는 통제하지 않습니다.\n- 민감도 기준은 전국 발생비중, 시도별 재질구성 평균, 균등, 해당 시도를 제외한 전국 구성입니다. 순위 변화는 가중치 선택에 대한 설명이지 정책 우열이 아닙니다.\n- 시도 17개는 관측 전수 집계입니다. p값과 신뢰구간은 모델 가정에 의존하고 인과효과나 외적 타당성을 입증하지 않습니다.\n- 정책 시행지역·대상범위의 공식 자료가 없으므로 정책별 비교는 하지 않습니다.\n"])
+    if summary["law_linkage_verified"]:
+        md.extend(["\n## 법령 조문 근거\n","[조문 근거 CSV](../../tables/regional_indicator/ordinance_article_evidence.csv)는 법령명·버전 일련번호·조문 위치·공식 원문 링크·원문 해시를 보존합니다. 재질·수거방식의 언급은 검토 단서이며 운영정책의 시행 증거가 아닙니다.\n"])
     (report/"report.md").write_text("\n".join(md)+"\n",encoding="utf-8")
     weights_html=weights_display.to_html(index=False,float_format=lambda x:f"{x:.3f}")
     scores_html=scores.to_html(index=False,float_format=lambda x:f"{x:.3f}")
     sensitivity_html=sensitivity_summary.to_html(index=False,float_format=lambda x:f"{x:.3f}")
     stability_html=stability.to_html(index=False)
     body=(f'<header><p>2024년 실제 KOSIS 행정통계 · 17개 시도 · 출처 해시 기록</p><h1>{TITLE}</h1><p>재질 구성을 전국 실측 발생량 비중으로 고정한 비교 지표입니다. 정책효과 또는 최종 재생원료 수율을 뜻하지 않습니다.</p><p><a href="report.md">Markdown 보고서</a></p></header><main><section><h2>기준 가중치와 시도별 지표</h2>'+weights_html+scores_html+'</section>'+"".join(sections)+'<section><h2>가중치 민감도 요약</h2>'+sensitivity_html+'<h2>시도별 안정성 표시</h2>'+stability_html+'<h2>통계검정</h2>'+inference_html+'<h2>시군구·정책 자료 상태</h2><p>'+html.escape(note)+'</p><h2>재현</h2><code>'+html.escape(manifest["reproduction_command"])+'</code></section><footer><p>자료: <a href="https://kosis.kr/statHtml/statHtml.do?orgId=106&amp;tblId=DT_106N_29_2020005">KOSIS 표</a> · <a href="https://kwaste.or.kr/data/01.php">2024 전국 폐기물 통계 원문</a></p></footer></main>')
+    if summary["law_linkage_verified"]:
+        body=body.replace("<footer>",'<section><h2>법령 조문 근거</h2><p><a href="../../tables/regional_indicator/ordinance_article_evidence.csv">조문 근거 CSV</a>에서 법령 버전·조문 위치·공식 원문·해시를 확인할 수 있습니다. 조문 언급을 실제 운영정책의 증거로 환산하지 않습니다.</p></section><footer>')
     page='<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+TITLE+'</title><style>body{margin:0;background:#f3f6f5;color:#172e35;font:16px/1.65 "Malgun Gothic",sans-serif}header,main{max-width:1200px;margin:auto;padding:28px}header{padding-top:44px}section{background:white;border:1px solid #dbe5e4;border-radius:12px;margin:22px 0;padding:24px;overflow:auto}h1{font-size:32px}table{border-collapse:collapse;font-size:12px;display:block;overflow:auto;max-height:480px}td,th{padding:7px;border-bottom:1px solid #e1e8e7;white-space:nowrap;text-align:right}th{position:sticky;top:0;background:#eef4f3}a{color:#126c78}footer{max-width:1200px;margin:auto;padding:24px;color:#52666c}</style>'+body+'</html>'
     (report/"index.html").write_text(page,encoding="utf-8")
     manifest["artifacts"]={str(path.relative_to(output)).replace("\\","/"):{"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"bytes":path.stat().st_size}

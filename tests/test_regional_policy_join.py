@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from src.regional_data.policy_records import POLICY_FIELDS, verified_join
 
@@ -9,7 +10,8 @@ def materials():
         "generated_t":100.0,"material_recycling_t":50.0,"verification_status":"verified",
         "waste_scope":"household","measurement_stage":"material_recycling_treatment",
         "code_reference_month":"202412",
-        "compatibility_status":"2024_code_midyear_boundary_audited",
+        "compatibility_status":"2024_monthly_MOIS_code_name_roster_stable; input_binding_verified; geometry_not_assessed",
+        "boundary_input_binding_verified":True,
         "source_url":"https://example.gov/data","source_locator":"table 1"
     }])
 
@@ -55,3 +57,66 @@ def test_year_end_name_match_is_not_midyear_boundary_proof():
 def test_empty_policy_schema_has_boundary_provenance_fields():
     assert "administrative_boundary_verified" in POLICY_FIELDS
     assert "boundary_source_locator" in POLICY_FIELDS
+
+
+@pytest.mark.parametrize("status",[
+    None,pd.NA,"","unknown","review_required","input_changed",
+    "2024_code_midyear_boundary_audited",
+    "2024_monthly_MOIS_code_name_roster_stable; geometry_not_assessed",
+    "2024_monthly_MOIS_code_name_roster_unstable; input_binding_verified; geometry_not_assessed",
+    "not_2024_monthly_MOIS_code_name_roster_stable; input_binding_verified; geometry_not_assessed",
+    "2024_monthly_MOIS_code_name_roster_stable; input_binding_verified; geometry_not_assessed; review_required",
+    "2024_monthly_MOIS_code_name_roster_stable; input_binding_verified; geometry_not_assessed; input_changed",
+    "2024_monthly_MOIS_code_name_roster_stable; input_binding_verified; geometry_not_assessed; not_audited",
+])
+def test_policy_evidence_cannot_override_unknown_or_negative_outcome_audit(status):
+    frame=materials().astype({"compatibility_status":object})
+    frame.loc[0,"compatibility_status"]=status
+    joined,rejected=verified_join(frame,pd.DataFrame([policy()]))
+    assert joined.empty
+    assert "data_boundary_audit_missing" in rejected.iloc[0].reason
+
+
+@pytest.mark.parametrize("value",[None,pd.NA,False,"false","False","0",0,1,"1","yes","not true"])
+def test_binding_requires_explicit_true_not_a_truthy_value(value):
+    frame=materials().astype({"boundary_input_binding_verified":object})
+    frame.loc[0,"boundary_input_binding_verified"]=value
+    joined,rejected=verified_join(frame,pd.DataFrame([policy()]))
+    assert joined.empty
+    assert "data_boundary_input_binding_unverified" in rejected.iloc[0].reason
+
+
+@pytest.mark.parametrize("column",["compatibility_status","boundary_input_binding_verified"])
+def test_missing_audit_contract_column_is_not_verified(column):
+    joined,rejected=verified_join(materials().drop(columns=column),pd.DataFrame([policy()]))
+    assert joined.empty
+    assert "data_boundary_" in rejected.iloc[0].reason
+
+
+@pytest.mark.parametrize("value",[True,"true"," True "])
+def test_bound_audit_marker_allows_known_nested_unit_annotation(value):
+    frame=materials().astype({"boundary_input_binding_verified":object})
+    frame.loc[0,"boundary_input_binding_verified"]=value
+    frame.loc[0,"compatibility_status"]+="; 35_nested_general_districts_excluded"
+    joined,rejected=verified_join(frame,pd.DataFrame([policy()]))
+    assert len(joined)==1 and rejected.empty
+
+
+def test_a_single_unbound_selected_outcome_prevents_policy_join():
+    frame=pd.concat([materials(),materials().assign(material="폐유리류",boundary_input_binding_verified=False)],ignore_index=True)
+    joined,rejected=verified_join(frame,pd.DataFrame([policy(target_materials="폐지류;폐유리류")]))
+    assert joined.empty
+    assert "data_boundary_input_binding_unverified" in rejected.iloc[0].reason
+
+
+def test_no_matching_outcomes_cannot_use_empty_all_as_audit_success():
+    frame=materials().iloc[:0].drop(columns=["compatibility_status","boundary_input_binding_verified"])
+    joined,rejected=verified_join(frame,pd.DataFrame([policy()]))
+    assert joined.empty
+    assert rejected.iloc[0].reason=="no_matching_verified_material"
+
+
+def test_target_material_must_exist_even_with_verified_audit():
+    joined,rejected=verified_join(materials(),pd.DataFrame([policy(target_materials="폐유리류")]))
+    assert joined.empty
+    assert rejected.iloc[0].reason=="no_matching_verified_material"

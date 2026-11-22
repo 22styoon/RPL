@@ -4,9 +4,10 @@ import pandas as pd
 from src.model import ROOT
 from .clients import dump
 from .parsers import parse_counties
-from .geocodes import normalize_mois,attach_codes
+from .geocodes import normalize_mois_roster,attach_codes
 from .validation import validate_materials,verify_lineage,MATERIALS
 from .policy_records import POLICY_FIELDS,verified_join
+from .audit_evidence import assess_boundary_audit
 
 def prepare(root=ROOT,year=2024):
     root=Path(root)
@@ -34,7 +35,7 @@ def prepare(root=ROOT,year=2024):
     codes=pd.DataFrame(columns=["sido_name","sigungu_name","reference_year","sido_code","sigungu_code","code_reference_month","code_verified"])
     checkpoint=root/"data/raw/regional_2024/kr_admin_codes_2024/checkpoint.json"
     if checkpoint.exists():
-        codes=normalize_mois(json.loads(checkpoint.read_text(encoding="utf-8")))
+        codes=normalize_mois_roster(json.loads(checkpoint.read_text(encoding="utf-8")))
     codes.to_csv(directory/"admin_codes_202412.csv",index=False,encoding="utf-8-sig")
     candidate_columns=["sido_name","sigungu_name","material","reference_year","generated_t","material_recycling_t","sido_code","sigungu_code","source_id","source_url","source_locator","retrieved_at","verification_status","compatibility_status","measurement_stage","waste_scope"]
     counties=pd.DataFrame(columns=candidate_columns);exclusions=[]
@@ -68,13 +69,28 @@ def prepare(root=ROOT,year=2024):
                 else:
                     counties.loc[index,"verification_status"]="verified"
                     counties.loc[index,"compatibility_status"]="name_and_202412_code_match_midyear_boundary_not_audited"
-            counties.to_csv(directory/"sigungu_2024_materials_candidates.csv",index=False,encoding="utf-8-sig")
     verified=counties.loc[counties.verification_status=="verified"].copy()
     if not verified.empty:
         counts=verified.groupby("sigungu_code").material.nunique()
         verified=verified.loc[verified.sigungu_code.isin(counts[counts==4].index)]
         verified["administrative_level"]="sigungu"
         validate_materials(verified,region_key="sigungu_code");verify_lineage(verified)
+    # Bind audit evidence only after the CURRENT parsed/validated unit roster
+    # exists. A cached success flag alone cannot upgrade newly replaced inputs.
+    assessment=assess_boundary_audit(root,waste_frame=verified,december_frame=codes)
+    boundary_audit_ok=assessment["verified"]
+    metadata_code_snapshot=("2024_monthly_code_name_roster_stable_input_binding_verified_geometry_not_assessed"
+        if boundary_audit_ok else "202412_not_a_current_bound_midyear_audit")
+    for dataset in (counties,verified):
+        dataset["boundary_input_binding_verified"]=bool(boundary_audit_ok)
+        dataset["boundary_waste_roster_sha256"]=assessment.get("waste_roster_sha256","")
+        dataset["boundary_monthly_roster_sha256"]=assessment.get("monthly_roster_sha256","")
+        if not dataset.empty:
+            valid=dataset.verification_status.eq("verified")
+            dataset.loc[valid,"compatibility_status"]=(
+                "2024_monthly_MOIS_code_name_roster_stable; input_binding_verified; geometry_not_assessed"
+                if boundary_audit_ok else "name_and_202412_code_match_midyear_boundary_not_audited; input_binding_unverified")
+    counties.to_csv(directory/"sigungu_2024_materials_candidates.csv",index=False,encoding="utf-8-sig")
     verified.to_csv(directory/"sigungu_2024_materials_verified.csv",index=False,encoding="utf-8-sig")
     pd.DataFrame(exclusions,columns=["geography","material","reason","source_locator"]).to_csv(directory/"material_exclusions.csv",index=False,encoding="utf-8-sig")
     policy_path=directory/"policy_candidates_unverified.csv"
@@ -91,7 +107,15 @@ def prepare(root=ROOT,year=2024):
     result=dict(reference_year=year,sido_rows=len(regions),sigungu_candidates=len(counties),
         sigungu_verified_rows=len(verified),sigungu_verified_regions=verified.sigungu_code.nunique() if len(verified) else 0,
         policy_candidates=len(policies),policy_verified_rows=int(policies.evidence_status.eq("verified").sum()),
-        verified_join_rows=len(joined),metadata_code_snapshot="202412_not_a_midyear_boundary_audit",
+        verified_join_rows=len(joined),metadata_code_snapshot=metadata_code_snapshot,
+        administrative_boundary_audit_status=assessment["status"],
+        boundary_input_binding_verified=bool(boundary_audit_ok),
+        policy_join_boundary_input_verified=bool(boundary_audit_ok),
+        boundary_waste_roster_sha256=assessment.get("waste_roster_sha256",""),
+        boundary_monthly_roster_sha256=assessment.get("monthly_roster_sha256",""),
+        boundary_audit_reasons=assessment.get("reasons",[]),
+        boundary_audit_input_binding_version=assessment.get("input_binding_version"),
+        administrative_boundary_audit_geometry_assessed=False,
         reconciliation_rows=len(reconciliation),external_validity="not_assessable_no_compatible_independent_indicator")
     dump(directory/"manifest.json",result)
     return result

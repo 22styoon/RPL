@@ -16,6 +16,7 @@ import plotly.io as pio
 from src.model import ROOT
 from .standardization import compute_standardization
 from .recycling_indicator import BOUNDARY, evaluate_rates, pool_three_years
+from .indicator_robustness import build_robustness_tables, DOMAIN_LABELS
 
 TITLE = "재활용률은 같은 것을 측정하고 있는가?"
 COLORS = ["#25657d", "#c17b36", "#367c68", "#856394"]
@@ -104,13 +105,23 @@ def build_tables(root=ROOT):
         ("지역·시장 여건", "최종 산출", "잠재 교란"), ("정의·측정점", "보고 재활용률", "측정 효과"),
         ("최종 산출", "보고 재활용률", "물리량의 보고 반영")], columns=["출발", "도착", "경로 의미"])
     causal["자료구분"] = "인과 가설·효과 추정 없음"
-    return {"swiss_stages": swiss, "nea_scope": scope, "kosis_energy": energy,
+    tables = {"swiss_stages": swiss, "nea_scope": scope, "kosis_energy": energy,
             "regional_scores": regional, "regional_weights": weights, "regional_sensitivity": sensitivity,
             "regional_contributions": contributions, "weight_summary": summary,
             "composition_example": simpson, "composition_inputs": demo,
             "time_methods": time, "time_inputs": temporal_input, "partial_bounds": bounded,
-            "partial_inputs": incomplete, "mass_flow": mass_flow, "causal_edges": causal}, [
-                root / "data/processed/kosis_materials_2024.csv", sg_path, meta_path, raw]
+            "partial_inputs": incomplete, "mass_flow": mass_flow, "causal_edges": causal}
+    tables.update(build_robustness_tables(kr))
+    evidence = root / "data/indicator_followup_observations.csv"
+    tables["jrc_plastics"] = pd.read_csv(evidence)
+    jrc=tables["jrc_plastics"]
+    required_jrc = {"indicator", "rate_pct", "reference_year", "publication_year", "scope", "measurement_type", "source_id", "source_locator"}
+    if not required_jrc.issubset(jrc.columns) or len(jrc)!=2 or not jrc.source_id.eq("JRC25").all() or not jrc.reference_year.eq(2022).all() or not jrc.publication_year.eq(2025).all() or not jrc.rate_pct.between(0,100).all():
+        raise ValueError("Expected two labelled EU-27 2022 JRC model rates")
+    if not jrc.indicator.iloc[0].startswith("적정 수거율") or not jrc.indicator.iloc[1].startswith("폐기 후 재활용률"):
+        raise ValueError("JRC collection and EOL rates must retain their measurement labels and order")
+    return tables, [
+                root / "data/processed/kosis_materials_2024.csv", sg_path, meta_path, raw, evidence]
 
 
 def _grouped(frame, category, series, value, labels=None):
@@ -150,7 +161,36 @@ def build_figures(tables):
     labels = ["발생 100", "수거 70", "미수거 30", "공정투입 56", "선별잔재 14", "최종 재생물질 42", "공정손실 14"]
     figs["mass_flow"] = go.Figure(go.Sankey(node={"label": labels, "pad": 26, "thickness": 20, "color": [COLORS[0], COLORS[0], "#b6bfc1", COLORS[1], "#b6bfc1", COLORS[2], "#b6bfc1"]},
         link={"source": [0, 0, 1, 1, 3, 3], "target": [2, 1, 4, 3, 6, 5], "value": [30, 70, 14, 56, 14, 42], "color": "rgba(75,111,120,.25)"}))
-    return figs
+    evidence = tables["jrc_plastics"]
+    fig = go.Figure(go.Bar(x=["적정 수거 전체<br>(재활용 전용 수거 아님)","폐기 후 재활용률<br>(EOL)"], y=evidence.rate_pct, marker_color=COLORS[:2],
+                          text=evidence.rate_pct, texttemplate="%{text:.1f}%", textposition="outside"))
+    fig.update_layout(yaxis_range=[0,100], yaxis_title="보고된 모형 비율 (%)")
+    figs["jrc_plastics"] = fig
+    summary = tables["weight_pair_counts"]
+    fig = go.Figure()
+    for column, color in [("비교 방향이 유지되는 쌍", COLORS[2]), ("비교 방향이 달라질 수 있는 쌍", COLORS[1])]:
+        fig.add_bar(x=summary["가중치 범위"], y=summary[column], name=column, marker_color=color,
+                    text=summary[column], textposition="inside")
+    fig.update_layout(barmode="stack", yaxis_title="비교한 지역쌍 수 (총 136쌍)", yaxis_range=[0,150])
+    figs["weight_pair_counts"] = fig
+    matrix, order = _pair_matrix(tables)
+    fig = go.Figure(go.Heatmap(z=matrix, x=order, y=order, zmin=-1,zmax=1,
+        colorscale=[[0,"#c17b36"],[.2499,"#c17b36"],[.25,"#edf0ee"],[.7499,"#edf0ee"],[.75,"#367c68"],[1,"#367c68"]],
+        colorbar={"tickvals":[-1,0,1],"ticktext":["열 지역 우세","가중치에 따라 역전","행 지역 우세"]},
+        hovertemplate="행 %{y} / 열 %{x}<br>1=행 우세, 0=역전 가능, -1=열 우세<extra></extra>"))
+    fig.update_layout(height=720, yaxis_autorange="reversed", xaxis_title="비교 대상 지역(열)", yaxis_title="평가 지역(행)")
+    figs["weight_pair_matrix"] = fig
+    return dict(sorted(figs.items(), key=lambda item: int(CHARTS[item[0]][0])))
+
+
+def _pair_matrix(tables):
+    order = tables["regional_scores"].sort_values("전국 고정가중 표준화 S_r(%)", ascending=False).시도.tolist()
+    matrix = pd.DataFrame(np.nan,index=order,columns=order)
+    for row in tables["weight_pair_matrix"].itertuples(index=False):
+        value = 1 if row.comparison in ["a_strict","a_no_reversal"] else -1 if row.comparison in ["b_strict","b_no_reversal"] else 0
+        matrix.loc[row.entity_a,row.entity_b] = value
+        matrix.loc[row.entity_b,row.entity_a] = -value
+    return matrix.to_numpy(), order
 
 
 CHARTS = {
@@ -162,6 +202,9 @@ CHARTS = {
     "time_methods": ("06", "연도 집계 방식도 같은 질문을 답하지 않는다", "가상 설명 · EPR 의무율 산식 재현 아님", "연간 발생량 200·100·50t과 회수율 30·50·70%를 사용했다. 3년 질량합산과 연간 비율 평균은 다른 추정 대상이다. 한국 법정 실적 가중치는 의무율 산정연도 t−2부터 과거 3년을 참조한다.", ["KR_EPR"]),
     "partial_bounds": ("07", "미확인 산출량은 점수가 아닌 구간으로 남긴다", "가상 설명 · 물리적 식별구간 · 통계적 신뢰구간 아님", "관측된 종이 회수율 80%와 미확인 플라스틱에 각각 가중치 0.5를 적용하면 S는 40–90%다. 미확인 출력을 0으로 대입한 관측값이나 구간 중간값을 발표하지 않는다.", []),
     "mass_flow": ("08", "물질흐름에서 비교할 단계를 고정한다", "가상 설명 · 동일 코호트·무수 대상물질 기준 · 단위 t", "70% 수거 × 80% 선별 후 투입 × 75% 공정수율 = 42% 최종 회수다. 각 항은 같은 물질흐름이어야 하며 이것은 회계 항등식이다.", ["GRAEDEL11", "HAUPT17"]),
+    "jrc_plastics": ("09", "적정 수거와 최종 재활용을 구분한 최신 기관 연구", "기관 모형 · EU-27 플라스틱 2022 · JRC 2025 발표", "적정 수거 86%는 재활용용 수거만을 뜻하지 않으며 처분 경로를 포함한다. EOL 재활용률 19.6%와 감산·나눗셈하여 공정손실이나 수율을 추정하지 않는다. 한국 관측 H/S나 municipal 4재질과 범위가 다르다.", ["JRC25"]),
+    "weight_pair_counts": ("10", "가중치 범위 전체에서 비교 방향이 유지되는가", "실제 처리통계 · KOSIS 2024 · 17개 시도 136쌍", "3개 공통 가중치의 혼합, 재질별 최소·최대 경계 전체, 비음수 가중치 전체를 각각 검증했다. 집합이 넓어질수록 보장되는 비교가 줄 수 있다. 가중치 범위는 선언한 시나리오이며 확률·신뢰구간·사회적 합의가 아니다.", ["KOSIS24","SETH18"]),
+    "weight_pair_matrix": ("11", "단일 순위 대신 가중치 전체에 견디는 비교를 표시한다", "실제 처리통계 · 모든 비음수 공통 가중치의 보수적 검증", "초록은 행 지역의 비율이 모든 공통 가중치에서 열 지역보다 높게 유지됨을, 주황은 반대 방향을 뜻한다. 회색은 가중치에 따라 우열이 바뀔 수 있다. 대각선은 자기비교를 제외한다. 최종 회수율·정책 인과효과의 우열은 아니다.", ["KOSIS24","SETH18"]),
 }
 
 
@@ -181,7 +224,7 @@ def save_static(tables, directory):
         plt.close(fig)
 
     for name, (_, title, label, note, _) in CHARTS.items():
-        fig, ax = plt.subplots(figsize=(11.5, 8.5 if name == "regional_scores" else 5.5))
+        fig, ax = plt.subplots(figsize=(11.5, 8.5 if name in ["regional_scores","weight_pair_matrix"] else 5.5))
         fig.patch.set_facecolor("#faf9f6")
         ax.set_facecolor("#faf9f6")
         if name in ["swiss_stages", "composition_example"]:
@@ -213,6 +256,27 @@ def save_static(tables, directory):
             ax.text(65, 0, "40–90%\n최종 산출 미확인에 따른 식별구간", ha="center", va="center", color="white", fontweight="bold")
             ax.set_xlim(0, 100)
             ax.set_xlabel("표준화 최종 회수율 S (%)")
+        elif name == "weight_pair_matrix":
+            from matplotlib.colors import ListedColormap, BoundaryNorm
+            matrix, order = _pair_matrix(tables)
+            cmap = ListedColormap([COLORS[1],"#edf0ee",COLORS[2]])
+            ax.imshow(matrix,cmap=cmap,norm=BoundaryNorm([-1.5,-.5,.5,1.5],cmap.N))
+            ax.set_xticks(range(len(order)),order,rotation=90)
+            ax.set_yticks(range(len(order)),order)
+            ax.set_xlabel("열 지역 · 초록=행 우세, 주황=열 우세, 회색=역전 가능")
+        elif name == "weight_pair_counts":
+            part=tables[name]
+            bottom=np.zeros(len(part))
+            for column,color in [("비교 방향이 유지되는 쌍",COLORS[2]),("비교 방향이 달라질 수 있는 쌍",COLORS[1])]:
+                bars=ax.bar(part["가중치 범위"],part[column],bottom=bottom,color=color,label=column)
+                ax.bar_label(bars,label_type="center",color="white",fmt="%.0f")
+                bottom+=part[column].to_numpy()
+            ax.set_ylim(0,160); ax.set_ylabel("지역쌍 수 (총 136쌍)"); ax.legend(loc="upper right",fontsize=9)
+        elif name == "jrc_plastics":
+            part=tables[name]
+            bars=ax.bar(["적정 수거 전체\n(재활용 전용 수거 아님)","폐기 후 재활용률\n(EOL)"],part.rate_pct,color=COLORS[:2])
+            ax.bar_label(bars,fmt="%.1f%%",padding=5)
+            ax.set_ylim(0,105); ax.set_ylabel("기관 모형의 보고 비율 (%)")
         elif name == "mass_flow":
             values = [100, 70, 56, 42]
             bars = ax.bar(["발생", "수거", "공정투입", "최종 재생물질"], values, color=[COLORS[0], COLORS[0], COLORS[1], COLORS[2]])
@@ -230,7 +294,7 @@ def save_static(tables, directory):
         ax.spines[["top", "right"]].set_visible(False)
         ax.grid(axis="x" if name in ["regional_scores", "partial_bounds"] else "y", alpha=.15)
         ax.set_axisbelow(True)
-        fig.text(.02, .012, "RPL 연구안 v1 · 수치 원본은 같은 이름의 CSV · 출처와 해석 범위는 보고서 참조", fontsize=9, color="#596b6c")
+        fig.text(.02, .012, "RPL 연구안 v1.1 · 수치 원본은 같은 이름의 CSV · 출처와 해석 범위는 보고서 참조", fontsize=9, color="#596b6c")
         fig.tight_layout(rect=[0, .04, 1, 1])
         save(fig, name)
 
@@ -270,6 +334,11 @@ def run(root=ROOT, output_root=None):
         frame.to_csv(tables_dir / f"{name}.csv", index=False, encoding="utf-8-sig")
     sources_path = root / "data/indicator_sources.json"
     sources = json.loads(sources_path.read_text(encoding="utf-8"))
+    followup_sources_path=root/"data/indicator_followup_sources.json"
+    sources.extend(json.loads(followup_sources_path.read_text(encoding="utf-8")))
+    if len({source["source_id"] for source in sources})!=len(sources):
+        raise ValueError("Duplicate research source IDs")
+    (report/"sources.json").write_text(json.dumps(sources,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     pd.DataFrame(sources).to_csv(tables_dir / "sources.csv", index=False, encoding="utf-8-sig")
     figs = build_figures(tables)
     save_static(tables, figures)
@@ -293,7 +362,9 @@ def run(root=ROOT, output_root=None):
         cards.append(f'<article id="source-{e("source_id")}" class="source"><p class="eyebrow">{e("source_id")} · {e("type")}</p><h3><a href="{html.escape(source["url"], quote=True)}">{e("title")}</a></h3><p>{e("authors")} · {e("year")}</p><p>{e("contribution")}</p><p class="muted">확인: {e("verified")} · {e("locator")}<br>한계: {e("limitation")}</p></article>')
     # Keep the full study and evidence alongside the HTML for review and sharing.
     for src, name in [(root / "docs/recycling_indicator_study.md", "study.md"),
-                      (root / "docs/indicator_data_contract.md", "data_contract.md"), (sources_path, "sources.json")]:
+                      (root / "docs/indicator_data_contract.md", "data_contract.md"),
+                      (root/"docs/indicator_weight_robustness_2026-11-19.md","weight_robustness.md"),
+                      (root/"docs/indicator_followup_evidence_2026-11-19.md","followup_evidence.md")]:
         content = src.read_text(encoding="utf-8")
         if src.suffix == ".md":
             def local_link(match):
@@ -301,7 +372,9 @@ def run(root=ROOT, output_root=None):
                 if ":" in target or target.startswith("#"):
                     return match.group(0)
                 source_target = (src.parent / target).resolve()
-                renamed = {root / "docs/recycling_indicator_study.md": "study.md", root / "docs/indicator_data_contract.md": "data_contract.md"}
+                renamed = {root / "docs/recycling_indicator_study.md": "study.md", root / "docs/indicator_data_contract.md": "data_contract.md",
+                           root / "docs/indicator_weight_robustness_2026-11-19.md": "weight_robustness.md",
+                           root / "docs/indicator_followup_evidence_2026-11-19.md": "followup_evidence.md"}
                 relative = renamed.get(source_target, os.path.relpath(source_target, report).replace("\\", "/"))
                 return "](" + relative + ")"
             content = re.sub(r"\]\(([^)]+)\)", local_link, content)
@@ -309,21 +382,29 @@ def run(root=ROOT, output_root=None):
     regional = tables["regional_scores"]
     energy_gap = float(tables["kosis_energy"]["처리비율(%)"].iloc[0] - tables["kosis_energy"]["처리비율(%)"].iloc[1])
     scope_values = tables["nea_scope"]["보고량으로 계산한 비율(%)"].tolist()
-    summary = {"source_items": len(sources), "figure_count": 9, "regional_count": len(regional),
+    robustness=tables["weight_pair_counts"].set_index("domain")
+    summary = {"source_items": len(sources), "figure_count": len(figs)+1, "regional_count": len(regional),
                "kosis_energy_gap_pp": energy_gap, "nea_scope_rates_pct": scope_values,
                "maximum_composition_gap_pp": float(regional["구성 차이 R-S(%p)"].abs().max()),
-               "final_output_country_comparison": "not_identified", "policy_causal_effect": "not_estimated"}
+               "final_output_country_comparison": "not_identified", "policy_causal_effect": "not_estimated",
+               "robust_nonreversal_pairs": {name:int(robustness.loc[name,"nonreversal_pairs"]) for name in DOMAIN_LABELS},
+               "pair_count":int(robustness.pair_count.iloc[0]), "latest_evidence_check":"2026-11-19"}
     generated = datetime.now(ZoneInfo("Asia/Seoul")).isoformat(timespec="seconds")
     template = Template((root / "docs/indicator_report_template.html").read_text(encoding="utf-8"))
     page = template.substitute(title=html.escape(TITLE), generated=generated, source_count=len(sources),
         energy_gap=f"{energy_gap:.2f}", scope_start=f"{scope_values[0]:.2f}", scope_end=f"{scope_values[-1]:.2f}",
         composition_gap=f'{summary["maximum_composition_gap_pp"]:.2f}',
+        hull_pairs=summary["robust_nonreversal_pairs"]["reference_hull"],
+        box_pairs=summary["robust_nonreversal_pairs"]["reference_box"],
+        simplex_pairs=summary["robust_nonreversal_pairs"]["all_simplex"],
         causal_image="data:image/svg+xml;base64," + base64.b64encode((figures / "causal_dag.svg").read_bytes()).decode("ascii"),
         charts="\n".join(sections), sources="\n".join(cards))
     (report / "index.html").write_text(page, encoding="utf-8")
     code = [root / path for path in ["src/analysis/recycling_indicator.py", "src/analysis/recycling_indicator_report.py",
         "src/analysis/standardization.py", "scripts/run_recycling_indicator.py", "docs/recycling_indicator_study.md",
-        "docs/indicator_data_contract.md", "docs/indicator_report_template.html", "data/indicator_sources.json"]]
+        "docs/indicator_data_contract.md", "docs/indicator_report_template.html", "data/indicator_sources.json",
+        "data/indicator_followup_sources.json","docs/indicator_followup_evidence_2026-11-19.md",
+        "docs/indicator_weight_robustness_2026-11-19.md","src/analysis/weight_robustness.py","src/analysis/indicator_robustness.py"]]
     files = [{"path": path.relative_to(root).as_posix(), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()} for path in [*inputs, *code]]
     artifacts = {path.relative_to(output).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
                  for directory in [report, figures, tables_dir] for path in sorted(directory.iterdir())

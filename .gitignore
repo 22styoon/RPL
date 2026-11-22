@@ -10,3 +10,7 @@ data/processed/international/uk_waste/
 # Regional raw workbook copies and API response caches are locally reproducible;
 # the source redistribution terms are not yet confirmed.
 data/raw/regional_2024/kr_waste_2024_detail/
+# Regional source evidence and normalized observations are regenerated locally;
+# redistribution of the source workbook and its detailed rows is unverified.
+data/raw/regional_2024/
+data/processed/regional_2024/
