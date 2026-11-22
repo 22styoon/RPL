@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from src.regional_data.prepare import prepare
+from src.regional_data.followup_reporting import program_evidence, program_summary, write_program_tables
 
 def main(argv=None):
     for stream in (sys.stdout,sys.stderr):
@@ -12,8 +13,12 @@ def main(argv=None):
     parser.add_argument("--year",type=int,default=2024)
     args=parser.parse_args(argv)
     result=prepare(year=args.year)
+    evidence = program_evidence(ROOT)
+    if evidence is not None:
+        write_program_tables(evidence, ROOT / "data/processed/regional_2024")
     print(json.dumps({"year":args.year,"policy_candidates":result["policy_candidates"],
         "verified_policy_rows":result["policy_verified_rows"],"verified_join_rows":result["verified_join_rows"],
+        **program_summary(evidence),
         "join_csv":"data/processed/regional_2024/sigungu_2024_policy_material_join_verified.csv",
         "exclusions_csv":"data/processed/regional_2024/join_exclusions.csv"},ensure_ascii=False,indent=2))
     return 0
